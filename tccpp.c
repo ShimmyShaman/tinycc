@@ -1835,6 +1835,10 @@ ST_FUNC void preprocess(int is_bof)
 	    buf[len - 2] = '\0';
         }
 
+        // if(strcmp(buf, "stdarg.h")) {
+        //     goto include_done;
+        // }
+
         if (s1->include_stack_ptr >= s1->include_stack + INCLUDE_STACK_SIZE)
             tcc_error("#include recursion too deep");
         /* push current file on stack */
@@ -3624,9 +3628,10 @@ ST_INLN void unget_tok(int last_tok)
 
 static void tcc_predefs(CString *cstr)
 {
+    return;
     cstr_cat(cstr,
 
-    //"#include <tcc_predefs.h>\n"
+    "#include <tcc_predefs.h>\n"
 
 #if defined TCC_TARGET_X86_64
 #ifndef TCC_TARGET_PE

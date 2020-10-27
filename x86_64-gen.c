@@ -733,266 +733,266 @@ static int arg_prepare_reg(int idx) {
       return arg_regs[idx];
 }
 
-/* Generate function call. The function address is pushed first, then
-   all the parameters in call order. This functions pops all the
-   parameters and the function address. */
+// /* Generate function call. The function address is pushed first, then
+//    all the parameters in call order. This functions pops all the
+//    parameters and the function address. */
 
-static void gen_offs_sp(int b, int r, int d)
-{
-    orex(1,0,r & 0x100 ? 0 : r, b);
-    if (d == (char)d) {
-        o(0x2444 | (REG_VALUE(r) << 3));
-        g(d);
-    } else {
-        o(0x2484 | (REG_VALUE(r) << 3));
-        gen_le32(d);
-    }
-}
+// static void gen_offs_sp(int b, int r, int d)
+// {
+//     orex(1,0,r & 0x100 ? 0 : r, b);
+//     if (d == (char)d) {
+//         o(0x2444 | (REG_VALUE(r) << 3));
+//         g(d);
+//     } else {
+//         o(0x2484 | (REG_VALUE(r) << 3));
+//         gen_le32(d);
+//     }
+// }
 
-static int using_regs(int size)
-{
-    return !(size > 8 || (size & (size - 1)));
-}
+// static int using_regs(int size)
+// {
+//     return !(size > 8 || (size & (size - 1)));
+// }
 
-/* Return the number of registers needed to return the struct, or 0 if
-   returning via struct pointer. */
-ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret, int *ret_align, int *regsize)
-{
-    int size, align;
-    *ret_align = 1; // Never have to re-align return values for x86-64
-    *regsize = 8;
-    size = type_size(vt, &align);
-    if (!using_regs(size))
-        return 0;
-    if (size == 8)
-        ret->t = VT_LLONG;
-    else if (size == 4)
-        ret->t = VT_INT;
-    else if (size == 2)
-        ret->t = VT_SHORT;
-    else
-        ret->t = VT_BYTE;
-    ret->ref = NULL;
-    return 1;
-}
+// /* Return the number of registers needed to return the struct, or 0 if
+//    returning via struct pointer. */
+// ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret, int *ret_align, int *regsize)
+// {
+//     int size, align;
+//     *ret_align = 1; // Never have to re-align return values for x86-64
+//     *regsize = 8;
+//     size = type_size(vt, &align);
+//     if (!using_regs(size))
+//         return 0;
+//     if (size == 8)
+//         ret->t = VT_LLONG;
+//     else if (size == 4)
+//         ret->t = VT_INT;
+//     else if (size == 2)
+//         ret->t = VT_SHORT;
+//     else
+//         ret->t = VT_BYTE;
+//     ret->ref = NULL;
+//     return 1;
+// }
 
-static int is_sse_float(int t) {
-    int bt;
-    bt = t & VT_BTYPE;
-    return bt == VT_DOUBLE || bt == VT_FLOAT;
-}
+// static int is_sse_float(int t) {
+//     int bt;
+//     bt = t & VT_BTYPE;
+//     return bt == VT_DOUBLE || bt == VT_FLOAT;
+// }
 
-static int gfunc_arg_size(CType *type) {
-    int align;
-    if (type->t & (VT_ARRAY|VT_BITFIELD))
-        return 8;
-    return type_size(type, &align);
-}
+// static int gfunc_arg_size(CType *type) {
+//     int align;
+//     if (type->t & (VT_ARRAY|VT_BITFIELD))
+//         return 8;
+//     return type_size(type, &align);
+// }
 
-void gfunc_call(int nb_args)
-{
-    int size, r, args_size, i, d, bt, struct_size;
-    int arg;
+// void gfunc_call(int nb_args)
+// {
+//     int size, r, args_size, i, d, bt, struct_size;
+//     int arg;
 
-#ifdef CONFIG_TCC_BCHECK
-    if (tcc_state->do_bounds_check)
-        gbound_args(nb_args);
-#endif
+// #ifdef CONFIG_TCC_BCHECK
+//     if (tcc_state->do_bounds_check)
+//         gbound_args(nb_args);
+// #endif
 
-    args_size = (nb_args < REGN ? REGN : nb_args) * PTR_SIZE;
-    arg = nb_args;
+//     args_size = (nb_args < REGN ? REGN : nb_args) * PTR_SIZE;
+//     arg = nb_args;
 
-    /* for struct arguments, we need to call memcpy and the function
-       call breaks register passing arguments we are preparing.
-       So, we process arguments which will be passed by stack first. */
-    struct_size = args_size;
-    for(i = 0; i < nb_args; i++) {
-        SValue *sv;
+//     /* for struct arguments, we need to call memcpy and the function
+//        call breaks register passing arguments we are preparing.
+//        So, we process arguments which will be passed by stack first. */
+//     struct_size = args_size;
+//     for(i = 0; i < nb_args; i++) {
+//         SValue *sv;
         
-        --arg;
-        sv = &vtop[-i];
-        bt = (sv->type.t & VT_BTYPE);
-        size = gfunc_arg_size(&sv->type);
+//         --arg;
+//         sv = &vtop[-i];
+//         bt = (sv->type.t & VT_BTYPE);
+//         size = gfunc_arg_size(&sv->type);
 
-        if (using_regs(size))
-            continue; /* arguments smaller than 8 bytes passed in registers or on stack */
+//         if (using_regs(size))
+//             continue; /* arguments smaller than 8 bytes passed in registers or on stack */
 
-        if (bt == VT_STRUCT) {
-            /* align to stack align size */
-            size = (size + 15) & ~15;
-            /* generate structure store */
-            r = get_reg(RC_INT);
-            gen_offs_sp(0x8d, r, struct_size);
-            struct_size += size;
+//         if (bt == VT_STRUCT) {
+//             /* align to stack align size */
+//             size = (size + 15) & ~15;
+//             /* generate structure store */
+//             r = get_reg(RC_INT);
+//             gen_offs_sp(0x8d, r, struct_size);
+//             struct_size += size;
 
-            /* generate memcpy call */
-            vset(&sv->type, r | VT_LVAL, 0);
-            vpushv(sv);
-            vstore();
-            --vtop;
-        } else if (bt == VT_LDOUBLE) {
-            gv(RC_ST0);
-            gen_offs_sp(0xdb, 0x107, struct_size);
-            struct_size += 16;
-        }
-    }
+//             /* generate memcpy call */
+//             vset(&sv->type, r | VT_LVAL, 0);
+//             vpushv(sv);
+//             vstore();
+//             --vtop;
+//         } else if (bt == VT_LDOUBLE) {
+//             gv(RC_ST0);
+//             gen_offs_sp(0xdb, 0x107, struct_size);
+//             struct_size += 16;
+//         }
+//     }
 
-    if (func_scratch < struct_size)
-        func_scratch = struct_size;
+//     if (func_scratch < struct_size)
+//         func_scratch = struct_size;
 
-    arg = nb_args;
-    struct_size = args_size;
+//     arg = nb_args;
+//     struct_size = args_size;
 
-    for(i = 0; i < nb_args; i++) {
-        --arg;
-        bt = (vtop->type.t & VT_BTYPE);
+//     for(i = 0; i < nb_args; i++) {
+//         --arg;
+//         bt = (vtop->type.t & VT_BTYPE);
 
-        size = gfunc_arg_size(&vtop->type);
-        if (!using_regs(size)) {
-            /* align to stack align size */
-            size = (size + 15) & ~15;
-            if (arg >= REGN) {
-                d = get_reg(RC_INT);
-                gen_offs_sp(0x8d, d, struct_size);
-                gen_offs_sp(0x89, d, arg*8);
-            } else {
-                d = arg_prepare_reg(arg);
-                gen_offs_sp(0x8d, d, struct_size);
-            }
-            struct_size += size;
-        } else {
-            if (is_sse_float(vtop->type.t)) {
-		if (tcc_state->nosse)
-		  tcc_error("SSE disabled");
-                if (arg >= REGN) {
-                    gv(RC_XMM0);
-                    /* movq %xmm0, j*8(%rsp) */
-                    gen_offs_sp(0xd60f66, 0x100, arg*8);
-                } else {
-                    /* Load directly to xmmN register */
-                    gv(RC_XMM0 << arg);
-                    d = arg_prepare_reg(arg);
-                    /* mov %xmmN, %rxx */
-                    o(0x66);
-                    orex(1,d,0, 0x7e0f);
-                    o(0xc0 + arg*8 + REG_VALUE(d));
-                }
-            } else {
-                if (bt == VT_STRUCT) {
-                    vtop->type.ref = NULL;
-                    vtop->type.t = size > 4 ? VT_LLONG : size > 2 ? VT_INT
-                        : size > 1 ? VT_SHORT : VT_BYTE;
-                }
+//         size = gfunc_arg_size(&vtop->type);
+//         if (!using_regs(size)) {
+//             /* align to stack align size */
+//             size = (size + 15) & ~15;
+//             if (arg >= REGN) {
+//                 d = get_reg(RC_INT);
+//                 gen_offs_sp(0x8d, d, struct_size);
+//                 gen_offs_sp(0x89, d, arg*8);
+//             } else {
+//                 d = arg_prepare_reg(arg);
+//                 gen_offs_sp(0x8d, d, struct_size);
+//             }
+//             struct_size += size;
+//         } else {
+//             if (is_sse_float(vtop->type.t)) {
+// 		if (tcc_state->nosse)
+// 		  tcc_error("SSE disabled");
+//                 if (arg >= REGN) {
+//                     gv(RC_XMM0);
+//                     /* movq %xmm0, j*8(%rsp) */
+//                     gen_offs_sp(0xd60f66, 0x100, arg*8);
+//                 } else {
+//                     /* Load directly to xmmN register */
+//                     gv(RC_XMM0 << arg);
+//                     d = arg_prepare_reg(arg);
+//                     /* mov %xmmN, %rxx */
+//                     o(0x66);
+//                     orex(1,d,0, 0x7e0f);
+//                     o(0xc0 + arg*8 + REG_VALUE(d));
+//                 }
+//             } else {
+//                 if (bt == VT_STRUCT) {
+//                     vtop->type.ref = NULL;
+//                     vtop->type.t = size > 4 ? VT_LLONG : size > 2 ? VT_INT
+//                         : size > 1 ? VT_SHORT : VT_BYTE;
+//                 }
                 
-                r = gv(RC_INT);
-                if (arg >= REGN) {
-                    gen_offs_sp(0x89, r, arg*8);
-                } else {
-                    d = arg_prepare_reg(arg);
-                    orex(1,d,r,0x89); /* mov */
-                    o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
-                }
-            }
-        }
-        vtop--;
-    }
-    save_regs(0);
-    /* Copy R10 and R11 into RCX and RDX, respectively */
-    if (nb_args > 0) {
-        o(0xd1894c); /* mov %r10, %rcx */
-        if (nb_args > 1) {
-            o(0xda894c); /* mov %r11, %rdx */
-        }
-    }
+//                 r = gv(RC_INT);
+//                 if (arg >= REGN) {
+//                     gen_offs_sp(0x89, r, arg*8);
+//                 } else {
+//                     d = arg_prepare_reg(arg);
+//                     orex(1,d,r,0x89); /* mov */
+//                     o(0xc0 + REG_VALUE(r) * 8 + REG_VALUE(d));
+//                 }
+//             }
+//         }
+//         vtop--;
+//     }
+//     save_regs(0);
+//     /* Copy R10 and R11 into RCX and RDX, respectively */
+//     if (nb_args > 0) {
+//         o(0xd1894c); /* mov %r10, %rcx */
+//         if (nb_args > 1) {
+//             o(0xda894c); /* mov %r11, %rdx */
+//         }
+//     }
     
-    gcall_or_jmp(0);
+//     gcall_or_jmp(0);
 
-    if ((vtop->r & VT_SYM) && vtop->sym->v == TOK_alloca) {
-        /* need to add the "func_scratch" area after alloca */
-        o(0x48); func_alloca = oad(0x05, func_alloca); /* add $NN, %rax */
-#ifdef CONFIG_TCC_BCHECK
-        if (tcc_state->do_bounds_check)
-            gen_bounds_call(TOK___bound_alloca_nr); /* new region */
-#endif
-    }
-    vtop--;
-}
+//     if ((vtop->r & VT_SYM) && vtop->sym->v == TOK_alloca) {
+//         /* need to add the "func_scratch" area after alloca */
+//         o(0x48); func_alloca = oad(0x05, func_alloca); /* add $NN, %rax */
+// #ifdef CONFIG_TCC_BCHECK
+//         if (tcc_state->do_bounds_check)
+//             gen_bounds_call(TOK___bound_alloca_nr); /* new region */
+// #endif
+//     }
+//     vtop--;
+// }
 
 
 #define FUNC_PROLOG_SIZE 11
 
-/* generate function prolog of type 't' */
-void gfunc_prolog(Sym *func_sym)
-{
-    CType *func_type = &func_sym->type;
-    int addr, reg_param_index, bt, size;
-    Sym *sym;
-    CType *type;
+// /* generate function prolog of type 't' */
+// void gfunc_prolog(Sym *func_sym)
+// {
+//     CType *func_type = &func_sym->type;
+//     int addr, reg_param_index, bt, size;
+//     Sym *sym;
+//     CType *type;
 
-    func_ret_sub = 0;
-    func_scratch = 32;
-    func_alloca = 0;
-    loc = 0;
+//     func_ret_sub = 0;
+//     func_scratch = 32;
+//     func_alloca = 0;
+//     loc = 0;
 
-    addr = PTR_SIZE * 2;
-    ind += FUNC_PROLOG_SIZE;
-    func_sub_sp_offset = ind;
-    reg_param_index = 0;
+//     addr = PTR_SIZE * 2;
+//     ind += FUNC_PROLOG_SIZE;
+//     func_sub_sp_offset = ind;
+//     reg_param_index = 0;
 
-    sym = func_type->ref;
+//     sym = func_type->ref;
 
-    /* if the function returns a structure, then add an
-       implicit pointer parameter */
-    size = gfunc_arg_size(&func_vt);
-    if (!using_regs(size)) {
-        gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
-        func_vc = addr;
-        reg_param_index++;
-        addr += 8;
-    }
+//     /* if the function returns a structure, then add an
+//        implicit pointer parameter */
+//     size = gfunc_arg_size(&func_vt);
+//     if (!using_regs(size)) {
+//         gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+//         func_vc = addr;
+//         reg_param_index++;
+//         addr += 8;
+//     }
 
-    /* define parameters */
-    while ((sym = sym->next) != NULL) {
-        type = &sym->type;
-        bt = type->t & VT_BTYPE;
-        size = gfunc_arg_size(type);
-        if (!using_regs(size)) {
-            if (reg_param_index < REGN) {
-                gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
-            }
-            sym_push(sym->v & ~SYM_FIELD, type,
-                     VT_LLOCAL | VT_LVAL, addr);
-        } else {
-            if (reg_param_index < REGN) {
-                /* save arguments passed by register */
-                if ((bt == VT_FLOAT) || (bt == VT_DOUBLE)) {
-		    if (tcc_state->nosse)
-		      tcc_error("SSE disabled");
-                    o(0xd60f66); /* movq */
-                    gen_modrm(reg_param_index, VT_LOCAL, NULL, addr);
-                } else {
-                    gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
-                }
-            }
-            sym_push(sym->v & ~SYM_FIELD, type,
-		     VT_LOCAL | VT_LVAL, addr);
-        }
-        addr += 8;
-        reg_param_index++;
-    }
+//     /* define parameters */
+//     while ((sym = sym->next) != NULL) {
+//         type = &sym->type;
+//         bt = type->t & VT_BTYPE;
+//         size = gfunc_arg_size(type);
+//         if (!using_regs(size)) {
+//             if (reg_param_index < REGN) {
+//                 gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+//             }
+//             sym_push(sym->v & ~SYM_FIELD, type,
+//                      VT_LLOCAL | VT_LVAL, addr);
+//         } else {
+//             if (reg_param_index < REGN) {
+//                 /* save arguments passed by register */
+//                 if ((bt == VT_FLOAT) || (bt == VT_DOUBLE)) {
+// 		    if (tcc_state->nosse)
+// 		      tcc_error("SSE disabled");
+//                     o(0xd60f66); /* movq */
+//                     gen_modrm(reg_param_index, VT_LOCAL, NULL, addr);
+//                 } else {
+//                     gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+//                 }
+//             }
+//             sym_push(sym->v & ~SYM_FIELD, type,
+// 		     VT_LOCAL | VT_LVAL, addr);
+//         }
+//         addr += 8;
+//         reg_param_index++;
+//     }
 
-    while (reg_param_index < REGN) {
-        if (func_var) {
-            gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
-            addr += 8;
-        }
-        reg_param_index++;
-    }
-#ifdef CONFIG_TCC_BCHECK
-    if (tcc_state->do_bounds_check)
-        gen_bounds_prolog();
-#endif
-}
+//     while (reg_param_index < REGN) {
+//         if (func_var) {
+//             gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
+//             addr += 8;
+//         }
+//         reg_param_index++;
+//     }
+// #ifdef CONFIG_TCC_BCHECK
+//     if (tcc_state->do_bounds_check)
+//         gen_bounds_prolog();
+// #endif
+// }
 
 /* generate function epilog */
 void gfunc_epilog(void)
@@ -2190,11 +2190,11 @@ ST_FUNC void gen_vla_sp_restore(int addr) {
 }
 
 #ifdef TCC_TARGET_PE
-/* Save result of gen_vla_alloc onto the stack */
-ST_FUNC void gen_vla_result(int addr) {
-    /* mov %rax,addr(%rbp)*/
-    gen_modrm64(0x89, TREG_RAX, VT_LOCAL, NULL, addr);
-}
+// /* Save result of gen_vla_alloc onto the stack */
+// ST_FUNC void gen_vla_result(int addr) {
+//     /* mov %rax,addr(%rbp)*/
+//     gen_modrm64(0x89, TREG_RAX, VT_LOCAL, NULL, addr);
+// }
 #endif
 
 /* Subtract from the stack pointer, and push the resulting value onto the stack */

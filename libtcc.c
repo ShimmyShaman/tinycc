@@ -75,45 +75,45 @@ static int nb_states;
 
 /********************************************************/
 #ifdef _WIN32
-ST_FUNC char *normalize_slashes(char *path)
-{
-    char *p;
-    for (p = path; *p; ++p)
-        if (*p == '\\')
-            *p = '/';
-    return path;
-}
+// ST_FUNC char *normalize_slashes(char *path)
+// {
+//     char *p;
+//     for (p = path; *p; ++p)
+//         if (*p == '\\')
+//             *p = '/';
+//     return path;
+// }
 
 static HMODULE tcc_module;
 
-/* on win32, we suppose the lib and includes are at the location of 'tcc.exe' */
-static void tcc_set_lib_path_w32(TCCState *s)
-{
-    char path[1024], *p;
-    GetModuleFileNameA(tcc_module, path, sizeof path);
-    p = tcc_basename(normalize_slashes(strlwr(path)));
-    if (p > path)
-        --p;
-    *p = 0;
-    tcc_set_lib_path(s, path);
-}
+// /* on win32, we suppose the lib and includes are at the location of 'tcc.exe' */
+// static void tcc_set_lib_path_w32(TCCState *s)
+// {
+//     char path[1024], *p;
+//     GetModuleFileNameA(tcc_module, path, sizeof path);
+//     p = tcc_basename(normalize_slashes(strlwr(path)));
+//     if (p > path)
+//         --p;
+//     *p = 0;
+//     tcc_set_lib_path(s, path);
+// }
 
 #ifdef TCC_TARGET_PE
-static void tcc_add_systemdir(TCCState *s)
-{
-    char buf[1000];
-    GetSystemDirectory(buf, sizeof buf);
-    tcc_add_library_path(s, normalize_slashes(buf));
-}
+// static void tcc_add_systemdir(TCCState *s)
+// {
+//     char buf[1000];
+//     GetSystemDirectory(buf, sizeof buf);
+//     tcc_add_library_path(s, normalize_slashes(buf));
+// }
 #endif
 
 #ifdef LIBTCC_AS_DLL
-BOOL WINAPI DllMain (HINSTANCE hDll, DWORD dwReason, LPVOID lpReserved)
-{
-    if (DLL_PROCESS_ATTACH == dwReason)
-        tcc_module = hDll;
-    return TRUE;
-}
+// BOOL WINAPI DllMain (HINSTANCE hDll, DWORD dwReason, LPVOID lpReserved)
+// {
+//     if (DLL_PROCESS_ATTACH == dwReason)
+//         tcc_module = hDll;
+//     return TRUE;
+// }
 #endif
 #endif
 
@@ -297,128 +297,128 @@ static mem_debug_header_t *mem_debug_chain;
 static unsigned mem_cur_size;
 static unsigned mem_max_size;
 
-static mem_debug_header_t *malloc_check(void *ptr, const char *msg)
-{
-    mem_debug_header_t * header = MEM_HEADER_PTR(ptr);
-    if (header->magic1 != MEM_DEBUG_MAGIC1 ||
-        header->magic2 != MEM_DEBUG_MAGIC2 ||
-        MEM_DEBUG_CHECK3(header) != MEM_DEBUG_MAGIC3 ||
-        header->size == (unsigned)-1) {
-        fprintf(stderr, "%s check failed\n", msg);
-        if (header->magic1 == MEM_DEBUG_MAGIC1)
-            fprintf(stderr, "%s:%u: block allocated here.\n",
-                header->file_name, header->line_num);
-        exit(1);
-    }
-    return header;
-}
+// static mem_debug_header_t *malloc_check(void *ptr, const char *msg)
+// {
+//     mem_debug_header_t * header = MEM_HEADER_PTR(ptr);
+//     if (header->magic1 != MEM_DEBUG_MAGIC1 ||
+//         header->magic2 != MEM_DEBUG_MAGIC2 ||
+//         MEM_DEBUG_CHECK3(header) != MEM_DEBUG_MAGIC3 ||
+//         header->size == (unsigned)-1) {
+//         fprintf(stderr, "%s check failed\n", msg);
+//         if (header->magic1 == MEM_DEBUG_MAGIC1)
+//             fprintf(stderr, "%s:%u: block allocated here.\n",
+//                 header->file_name, header->line_num);
+//         exit(1);
+//     }
+//     return header;
+// }
 
-PUB_FUNC void *tcc_malloc_debug(unsigned long size, const char *file, int line)
-{
-    int ofs;
-    mem_debug_header_t *header;
+// PUB_FUNC void *tcc_malloc_debug(unsigned long size, const char *file, int line)
+// {
+//     int ofs;
+//     mem_debug_header_t *header;
 
-    header = malloc(sizeof(mem_debug_header_t) + size);
-    if (!header)
-        _tcc_error("memory full (malloc)");
+//     header = malloc(sizeof(mem_debug_header_t) + size);
+//     if (!header)
+//         _tcc_error("memory full (malloc)");
 
-    header->magic1 = MEM_DEBUG_MAGIC1;
-    header->magic2 = MEM_DEBUG_MAGIC2;
-    header->size = size;
-    MEM_DEBUG_CHECK3(header) = MEM_DEBUG_MAGIC3;
-    header->line_num = line;
-    ofs = strlen(file) - MEM_DEBUG_FILE_LEN;
-    strncpy(header->file_name, file + (ofs > 0 ? ofs : 0), MEM_DEBUG_FILE_LEN);
-    header->file_name[MEM_DEBUG_FILE_LEN] = 0;
+//     header->magic1 = MEM_DEBUG_MAGIC1;
+//     header->magic2 = MEM_DEBUG_MAGIC2;
+//     header->size = size;
+//     MEM_DEBUG_CHECK3(header) = MEM_DEBUG_MAGIC3;
+//     header->line_num = line;
+//     ofs = strlen(file) - MEM_DEBUG_FILE_LEN;
+//     strncpy(header->file_name, file + (ofs > 0 ? ofs : 0), MEM_DEBUG_FILE_LEN);
+//     header->file_name[MEM_DEBUG_FILE_LEN] = 0;
 
-    header->next = mem_debug_chain;
-    header->prev = NULL;
-    if (header->next)
-        header->next->prev = header;
-    mem_debug_chain = header;
+//     header->next = mem_debug_chain;
+//     header->prev = NULL;
+//     if (header->next)
+//         header->next->prev = header;
+//     mem_debug_chain = header;
 
-    mem_cur_size += size;
-    if (mem_cur_size > mem_max_size)
-        mem_max_size = mem_cur_size;
+//     mem_cur_size += size;
+//     if (mem_cur_size > mem_max_size)
+//         mem_max_size = mem_cur_size;
 
-    return MEM_USER_PTR(header);
-}
+//     return MEM_USER_PTR(header);
+// }
 
-PUB_FUNC void tcc_free_debug(void *ptr)
-{
-    mem_debug_header_t *header;
-    if (!ptr)
-        return;
-    header = malloc_check(ptr, "tcc_free");
-    mem_cur_size -= header->size;
-    header->size = (unsigned)-1;
-    if (header->next)
-        header->next->prev = header->prev;
-    if (header->prev)
-        header->prev->next = header->next;
-    if (header == mem_debug_chain)
-        mem_debug_chain = header->next;
-    free(header);
-}
+// PUB_FUNC void tcc_free_debug(void *ptr)
+// {
+//     mem_debug_header_t *header;
+//     if (!ptr)
+//         return;
+//     header = malloc_check(ptr, "tcc_free");
+//     mem_cur_size -= header->size;
+//     header->size = (unsigned)-1;
+//     if (header->next)
+//         header->next->prev = header->prev;
+//     if (header->prev)
+//         header->prev->next = header->next;
+//     if (header == mem_debug_chain)
+//         mem_debug_chain = header->next;
+//     free(header);
+// }
 
-PUB_FUNC void *tcc_mallocz_debug(unsigned long size, const char *file, int line)
-{
-    void *ptr;
-    ptr = tcc_malloc_debug(size,file,line);
-    memset(ptr, 0, size);
-    return ptr;
-}
+// PUB_FUNC void *tcc_mallocz_debug(unsigned long size, const char *file, int line)
+// {
+//     void *ptr;
+//     ptr = tcc_malloc_debug(size,file,line);
+//     memset(ptr, 0, size);
+//     return ptr;
+// }
 
-PUB_FUNC void *tcc_realloc_debug(void *ptr, unsigned long size, const char *file, int line)
-{
-    mem_debug_header_t *header;
-    int mem_debug_chain_update = 0;
-    if (!ptr)
-        return tcc_malloc_debug(size, file, line);
-    header = malloc_check(ptr, "tcc_realloc");
-    mem_cur_size -= header->size;
-    mem_debug_chain_update = (header == mem_debug_chain);
-    header = realloc(header, sizeof(mem_debug_header_t) + size);
-    if (!header)
-        _tcc_error("memory full (realloc)");
-    header->size = size;
-    MEM_DEBUG_CHECK3(header) = MEM_DEBUG_MAGIC3;
-    if (header->next)
-        header->next->prev = header;
-    if (header->prev)
-        header->prev->next = header;
-    if (mem_debug_chain_update)
-        mem_debug_chain = header;
-    mem_cur_size += size;
-    if (mem_cur_size > mem_max_size)
-        mem_max_size = mem_cur_size;
-    return MEM_USER_PTR(header);
-}
+// PUB_FUNC void *tcc_realloc_debug(void *ptr, unsigned long size, const char *file, int line)
+// {
+//     mem_debug_header_t *header;
+//     int mem_debug_chain_update = 0;
+//     if (!ptr)
+//         return tcc_malloc_debug(size, file, line);
+//     header = malloc_check(ptr, "tcc_realloc");
+//     mem_cur_size -= header->size;
+//     mem_debug_chain_update = (header == mem_debug_chain);
+//     header = realloc(header, sizeof(mem_debug_header_t) + size);
+//     if (!header)
+//         _tcc_error("memory full (realloc)");
+//     header->size = size;
+//     MEM_DEBUG_CHECK3(header) = MEM_DEBUG_MAGIC3;
+//     if (header->next)
+//         header->next->prev = header;
+//     if (header->prev)
+//         header->prev->next = header;
+//     if (mem_debug_chain_update)
+//         mem_debug_chain = header;
+//     mem_cur_size += size;
+//     if (mem_cur_size > mem_max_size)
+//         mem_max_size = mem_cur_size;
+//     return MEM_USER_PTR(header);
+// }
 
-PUB_FUNC char *tcc_strdup_debug(const char *str, const char *file, int line)
-{
-    char *ptr;
-    ptr = tcc_malloc_debug(strlen(str) + 1, file, line);
-    strcpy(ptr, str);
-    return ptr;
-}
+// PUB_FUNC char *tcc_strdup_debug(const char *str, const char *file, int line)
+// {
+//     char *ptr;
+//     ptr = tcc_malloc_debug(strlen(str) + 1, file, line);
+//     strcpy(ptr, str);
+//     return ptr;
+// }
 
-PUB_FUNC void tcc_memcheck(void)
-{
-    if (mem_cur_size) {
-        mem_debug_header_t *header = mem_debug_chain;
-        fprintf(stderr, "MEM_DEBUG: mem_leak= %d bytes, mem_max_size= %d bytes\n",
-            mem_cur_size, mem_max_size);
-        while (header) {
-            fprintf(stderr, "%s:%u: error: %u bytes leaked\n",
-                header->file_name, header->line_num, header->size);
-            header = header->next;
-        }
-#if MEM_DEBUG-0 == 2
-        exit(2);
-#endif
-    }
-}
+// PUB_FUNC void tcc_memcheck(void)
+// {
+//     if (mem_cur_size) {
+//         mem_debug_header_t *header = mem_debug_chain;
+//         fprintf(stderr, "MEM_DEBUG: mem_leak= %d bytes, mem_max_size= %d bytes\n",
+//             mem_cur_size, mem_max_size);
+//         while (header) {
+//             fprintf(stderr, "%s:%u: error: %u bytes leaked\n",
+//                 header->file_name, header->line_num, header->size);
+//             header = header->next;
+//         }
+// #if MEM_DEBUG-0 == 2
+//         exit(2);
+// #endif
+//     }
+// }
 #endif /* MEM_DEBUG */
 
 #define free(p) use_tcc_free(p)
@@ -2104,21 +2104,21 @@ LIBTCCAPI void tcc_set_options(TCCState *s, const char *r)
     dynarray_reset(&argv, &argc);
 }
 
-PUB_FUNC void tcc_print_stats(TCCState *s1, unsigned total_time)
-{
-    if (total_time < 1)
-        total_time = 1;
-    if (total_bytes < 1)
-        total_bytes = 1;
-    fprintf(stderr, "* %d idents, %d lines, %d bytes\n"
-                    "* %0.3f s, %u lines/s, %0.1f MB/s\n",
-           total_idents, total_lines, total_bytes,
-           (double)total_time/1000,
-           (unsigned)total_lines*1000/total_time,
-           (double)total_bytes/1000/total_time);
-    fprintf(stderr, "* text %d, data %d, bss %d bytes\n",
-           s1->total_output[0], s1->total_output[1], s1->total_output[2]);
-#ifdef MEM_DEBUG
-    fprintf(stderr, "* %d bytes memory used\n", mem_max_size);
-#endif
-}
+// PUB_FUNC void tcc_print_stats(TCCState *s1, unsigned total_time)
+// {
+//     if (total_time < 1)
+//         total_time = 1;
+//     if (total_bytes < 1)
+//         total_bytes = 1;
+//     fprintf(stderr, "* %d idents, %d lines, %d bytes\n"
+//                     "* %0.3f s, %u lines/s, %0.1f MB/s\n",
+//            total_idents, total_lines, total_bytes,
+//            (double)total_time/1000,
+//            (unsigned)total_lines*1000/total_time,
+//            (double)total_bytes/1000/total_time);
+//     fprintf(stderr, "* text %d, data %d, bss %d bytes\n",
+//            s1->total_output[0], s1->total_output[1], s1->total_output[2]);
+// #ifdef MEM_DEBUG
+//     fprintf(stderr, "* %d bytes memory used\n", mem_max_size);
+// #endif
+// }

@@ -227,16 +227,21 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #endif
 
 /* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
-
+// MCDEBUG TODO
+    // ":" ALSO_TRIPLET(CONFIG_SYSROOT "/home/jason/proj/tcc/tinycc/include")              \
+    // ":" ALSO_TRIPLET(CONFIG_SYSROOT "/home/jason/proj/tcc/tinycc/tests/misc")           \
 /* system include paths */
 #ifndef CONFIG_TCC_SYSINCLUDEPATHS
 # if defined TCC_TARGET_PE || defined _WIN32
 #  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"PATHSEP"{B}/include/winapi"
 # else
-#  define CONFIG_TCC_SYSINCLUDEPATHS \
-        "{B}/include" \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT CONFIG_USR_INCLUDE)
+#define CONFIG_TCC_SYSINCLUDEPATHS                                                      \
+    "{B}/include"                                                                       \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include")                               \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/include")                                     \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/lib/gcc/x86_64-linux-gnu/7/include")          \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed")    \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/include/x86_64-linux-gnu")
 # endif
 #endif
 
@@ -245,10 +250,11 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # ifdef TCC_TARGET_PE
 #  define CONFIG_TCC_LIBPATHS "{B}/lib"
 # else
-#  define CONFIG_TCC_LIBPATHS \
-        ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR) \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR)
+#define CONFIG_TCC_LIBPATHS                                                     \
+    ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR)                           \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR)                           \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR)                 \
+    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR "/x86_64-linux-gnu") 
 # endif
 #endif
 
@@ -308,7 +314,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 /* (target specific) libtcc1.a */
 #ifndef TCC_LIBTCC1
-# define TCC_LIBTCC1 "libtcc1.a"
+// # define TCC_LIBTCC1 "libtcc1.a"
+#define TCC_LIBTCC1 ""
 #endif
 
 /* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
@@ -1683,7 +1690,7 @@ ST_FUNC void gen_cvt_csti(int t);
 /* ------------ riscv64-gen.c ------------ */
 #ifdef TCC_TARGET_RISCV64
 ST_FUNC void gen_opl(int op);
-//ST_FUNC void gfunc_return(CType *func_type);
+ST_FUNC void gfunc_return(CType *func_type);
 ST_FUNC void gen_va_start(void);
 ST_FUNC void arch_transfer_ret_regs(int);
 ST_FUNC void gen_cvt_sxtw(void);
