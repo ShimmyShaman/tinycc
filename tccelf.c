@@ -21,7 +21,7 @@
 #include "tcc.h"
 
 /* Define this to get some debug output during relocation processing.  */
-#undef DEBUG_RELOC
+#define DEBUG_RELOC
 
 /********************************************************/
 /* global variables */
@@ -180,8 +180,10 @@ ST_FUNC void tccelf_end_file(TCCState *s1)
     s->hash = s->reloc, s->reloc = NULL;
     tr = tcc_mallocz(nb_syms * sizeof *tr);
 
+    // printf("nb_syms:%i, first_sym:%i\n", nb_syms,first_sym);
     for (i = 0; i < nb_syms; ++i) {
         ElfSym *sym = (ElfSym*)s->data + first_sym + i;
+    // printf("-sym:'%s' st_info:%u st_shndx:%i\n", (char*)s->link->data + sym->st_name, sym->st_info, sym->st_shndx);
         if (sym->st_shndx == SHN_UNDEF
             && ELFW(ST_BIND)(sym->st_info) == STB_LOCAL)
             sym->st_info = ELFW(ST_INFO)(STB_GLOBAL, ELFW(ST_TYPE)(sym->st_info));
@@ -440,6 +442,7 @@ ST_FUNC int put_elf_sym(Section *s, addr_t value, unsigned long size,
     sym->st_other = other;
     sym->st_shndx = shndx;
     sym_index = sym - (ElfW(Sym) *)s->data;
+printf("put_elf_sym: '%s''%s' %lu\n", (name == NULL ? "(null)" : name), (char*)s->link->data + sym->st_name, sym->st_value);
     hs = s->hash;
     if (hs) {
         int *ptr, *base;
@@ -655,6 +658,7 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
     if (sym_bind != STB_LOCAL) {
         /* we search global or weak symbols */
         sym_index = find_elf_sym(s, name);
+        printf("%i = find_elf_sym(%s);\n", sym_index, name);
         if (!sym_index)
             goto do_def;
         esym = &((ElfW(Sym) *)s->data)[sym_index];
@@ -703,7 +707,7 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
 		   we can override.  */
 		goto do_patch;
             } else {
-#if 0
+#if 1
                 printf("new_bind=%x new_shndx=%x new_vis=%x old_bind=%x old_shndx=%x old_vis=%x\n",
                        sym_bind, shndx, new_vis, esym_bind, esym->st_shndx, esym_vis);
 #endif
@@ -895,11 +899,21 @@ ST_FUNC struct sym_attr *get_sym_attr(TCCState *s1, int index, int alloc)
    true and output error if undefined symbol. */
 ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
 {
+// {
+//     Section *sec = s1->symtab;
+//    int first_sym = sec->sh_offset / sizeof (ElfSym);
+//    int  nb_syms = sec->data_offset / sizeof (ElfSym) - first_sym;
+//     printf("End_Compile: nb_syms:%i, first_sym:%i\n", nb_syms,first_sym);
+//     for (int i = 0; i < nb_syms; ++i) {
+//         ElfSym *sym = (ElfSym*)sec->data + first_sym + i;
+//     printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char*)sec->link->data + sym->st_name, sym->st_info, sym->st_shndx, sym->st_value);
+//     }}
     ElfW(Sym) *sym;
     int sym_bind, sh_num;
     const char *name;
 
     for_each_elem(symtab, 1, sym, ElfW(Sym)) {
+        printf("<<<<%li>>>>\n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)));
         sh_num = sym->st_shndx;
         if (sh_num == SHN_UNDEF) {
             name = (char *) s1->symtab->link->data + sym->st_name;
@@ -916,7 +930,7 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
                 if (addr) {
                     sym->st_value = (addr_t) addr;
 #ifdef DEBUG_RELOC
-		    printf ("relocate_sym: %s -> 0x%lx\n", name, sym->st_value);
+		    printf ("relocate_sym: '%s' -> 0x%lx\n", name, sym->st_value);
 #endif
                     goto found;
                 }
@@ -937,7 +951,12 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
                 tcc_error_noabort("undefined symbol '%s'", name);
         } else if (sh_num < SHN_LORESERVE) {
             /* add section base */
+            printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char*)symtab->link->data + sym->st_name, sym->st_info,
+                sym->st_shndx, sym->st_value);
+            printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx,  s1->sections[sym->st_shndx]->name,
+                s1->sections[sym->st_shndx]->sh_addr);
             sym->st_value += s1->sections[sym->st_shndx]->sh_addr;
+    ++s1->nb_symtab_reloc_syms;
         }
     found: ;
     }
@@ -966,8 +985,11 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
         tgt += rel->r_addend;
 #endif
         addr = s->sh_addr + rel->r_offset;
+printf("sym_index:%i-'%s' type:%i ptr:%p addr:%p sym->st_value:%lu tgt:%p\n", sym_index, (char *) s1->symtab->link->data + sym->st_name,
+     type, ptr, (void *)addr, sym->st_value, (void *)tgt);
         relocate(s1, rel, type, ptr, addr, tgt);
     }
+puts("fff");
     /* if the relocation is allocated, we change its symbol table */
     if (sr->sh_flags & SHF_ALLOC) {
         sr->link = s1->dynsym;
@@ -1500,7 +1522,7 @@ ST_FUNC void resolve_common_syms(TCCState *s1)
     }
 
     /* Now assign linker provided symbols their value.  */
-    tcc_add_linker_symbols(s1);
+    // tcc_add_linker_symbols(s1);// TODO -- caused error .. didn't need it .. but should have it, same as line above
 }
 
 // static void tcc_output_binary(TCCState *s1, FILE *f,

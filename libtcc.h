@@ -2,8 +2,10 @@
 #define LIBTCC_H
 
 #ifndef LIBTCCAPI
-# define LIBTCCAPI
+#define LIBTCCAPI
 #endif
+
+#define LIBTCCINTERPAPI LIBTCCAPI
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,10 +67,10 @@ LIBTCCAPI int tcc_compile_string(TCCState *s, const char *buf);
 
 /* set output type. MUST BE CALLED before any compilation */
 LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type);
-#define TCC_OUTPUT_MEMORY   1 /* output will be run in memory (default) */
-#define TCC_OUTPUT_EXE      2 /* executable file */
-#define TCC_OUTPUT_DLL      3 /* dynamic library */
-#define TCC_OUTPUT_OBJ      4 /* object file */
+#define TCC_OUTPUT_MEMORY 1     /* output will be run in memory (default) */
+#define TCC_OUTPUT_EXE 2        /* executable file */
+#define TCC_OUTPUT_DLL 3        /* dynamic library */
+#define TCC_OUTPUT_OBJ 4        /* object file */
 #define TCC_OUTPUT_PREPROCESS 5 /* only preprocess (used internally) */
 
 /* equivalent to -Lpath option */
@@ -95,14 +97,30 @@ LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr);
    - NULL              : return required memory size for the step below
    - memory address    : copy code to memory passed by the caller
    returns -1 if error. */
-#define TCC_RELOCATE_AUTO (void*)1
+#define TCC_RELOCATE_AUTO (void *)1
 
 /* return symbol value or NULL if not found */
 LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name);
 
 /* return symbol value or NULL if not found */
 LIBTCCAPI void tcc_list_symbols(TCCState *s, void *ctx,
-    void (*symbol_cb)(void *ctx, const char *name, const void *val));
+                                void (*symbol_cb)(void *ctx, const char *name, const void *val));
+
+
+struct TCCInterpState;
+typedef struct TCCInterpState TCCInterpState;
+
+/* create a new TCC interpretation context */
+LIBTCCINTERPAPI TCCInterpState *tcc_interp_new(void);
+
+/* free a TCC interpretation context */
+LIBTCCINTERPAPI void tcc_interp_delete(TCCInterpState *ds);
+
+/* compile & link a c-code file-like declaration */
+LIBTCCINTERPAPI int tcc_interpret_string(TCCInterpState *ds, const char *filename, int line_offset,
+                                              const char *str);
+
+LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds);
 
 #ifdef __cplusplus
 }

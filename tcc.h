@@ -730,6 +730,8 @@ struct TCCState {
     /* output format, see TCC_OUTPUT_FORMAT_xxx */
     int output_format;
 
+    int nb_symtab_reloc_syms;
+
     /* C language options */
     unsigned char char_is_unsigned;
     unsigned char leading_underscore;
@@ -944,6 +946,14 @@ struct TCCState {
     char *deps_outfile; /* option -MF */
     int argc;
     char **argv;
+};
+
+struct TCCInterpState {
+    TCCState *s1;
+
+    void **runtime_mem_blocks; /* pointer to execution text blocks */
+    int nb_runtime_mem_blocks; /* number thereof */
+
 };
 
 struct filespec {
@@ -1236,9 +1246,10 @@ PUB_FUNC void *tcc_realloc_debug(void *ptr, unsigned long size, const char *file
 PUB_FUNC char *tcc_strdup_debug(const char *str, const char *file, int line);
 #endif
 
-#define free(p) use_tcc_free(p)
-#define malloc(s) use_tcc_malloc(s)
-#define realloc(p, s) use_tcc_realloc(p, s)
+// TODO -- not used ? there is no use_***** functions...
+// #define free(p) use_tcc_free(p)
+// #define malloc(s) use_tcc_malloc(s)
+// #define realloc(p, s) use_tcc_realloc(p, s)
 #undef strdup
 #define strdup(s) use_tcc_strdup(s)
 PUB_FUNC void _tcc_error_noabort(const char *fmt, ...) PRINTF_LIKE(1,2);

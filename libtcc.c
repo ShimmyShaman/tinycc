@@ -421,9 +421,9 @@ static unsigned mem_max_size;
 // }
 #endif /* MEM_DEBUG */
 
-#define free(p) use_tcc_free(p)
-#define malloc(s) use_tcc_malloc(s)
-#define realloc(p, s) use_tcc_realloc(p, s)
+// #define free(p) use_tcc_free(p) TODO not used/needed?
+// #define malloc(s) use_tcc_malloc(s)
+// #define realloc(p, s) use_tcc_realloc(p, s)
 
 /********************************************************/
 /* dynarrays */
@@ -742,12 +742,25 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd)
     tcc_exit_state();
 
     tccelf_end_file(s1);
+
     return s1->nb_errors != 0 ? -1 : 0;
 }
 
 LIBTCCAPI int tcc_compile_string(TCCState *s, const char *str)
 {
     return tcc_compile(s, s->filetype, str, -1);
+}
+
+LIBTCCINTERPAPI int tcc_interpret_string(TCCInterpState *ds, const char *filename, int line_offset,
+                                              const char *str)
+{
+  int res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
+  if (res)
+    return res;
+
+  res = tcci_update_symbols(ds);
+
+  return res;
 }
 
 /* define a preprocessor symbol. value can be NULL, sym can be "sym=val" */
@@ -788,6 +801,8 @@ LIBTCCAPI TCCState *tcc_new(void)
     s->cversion = 199901; /* default unless -std=c11 is supplied */
     s->warn_implicit_function_declaration = 1;
     s->ms_extensions = 1;
+
+    s->nb_symtab_reloc_syms = 1;
 
 #ifdef CHAR_IS_UNSIGNED
     s->char_is_unsigned = 1;
@@ -1022,6 +1037,23 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
     if (0 == --nb_states)
         tcc_memcheck();
 #endif
+}
+
+
+/* create a new TCC interpretation context */
+LIBTCCINTERPAPI TCCInterpState *tcc_interp_new(void)
+{
+    TCCInterpState *ds = tcc_mallocz(sizeof(TCCInterpState));
+    ds->s1 = tcc_new();
+
+    return ds;
+}
+
+/* free a TCC interpretation context */
+LIBTCCINTERPAPI void tcc_interp_delete(TCCInterpState *ds)
+{
+    tcc_delete(ds->s1);
+    free(ds);
 }
 
 LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
@@ -2104,21 +2136,21 @@ LIBTCCAPI void tcc_set_options(TCCState *s, const char *r)
     dynarray_reset(&argv, &argc);
 }
 
-// PUB_FUNC void tcc_print_stats(TCCState *s1, unsigned total_time)
-// {
-//     if (total_time < 1)
-//         total_time = 1;
-//     if (total_bytes < 1)
-//         total_bytes = 1;
-//     fprintf(stderr, "* %d idents, %d lines, %d bytes\n"
-//                     "* %0.3f s, %u lines/s, %0.1f MB/s\n",
-//            total_idents, total_lines, total_bytes,
-//            (double)total_time/1000,
-//            (unsigned)total_lines*1000/total_time,
-//            (double)total_bytes/1000/total_time);
-//     fprintf(stderr, "* text %d, data %d, bss %d bytes\n",
-//            s1->total_output[0], s1->total_output[1], s1->total_output[2]);
-// #ifdef MEM_DEBUG
-//     fprintf(stderr, "* %d bytes memory used\n", mem_max_size);
-// #endif
-// }
+PUB_FUNC void tcc_print_stats(TCCState *s1, unsigned total_time)
+{
+    if (total_time < 1)
+        total_time = 1;
+    if (total_bytes < 1)
+        total_bytes = 1;
+    fprintf(stderr, "* %d idents, %d lines, %d bytes\n"
+                    "* %0.3f s, %u lines/s, %0.1f MB/s\n",
+           total_idents, total_lines, total_bytes,
+           (double)total_time/1000,
+           (unsigned)total_lines*1000/total_time,
+           (double)total_bytes/1000/total_time);
+    fprintf(stderr, "* text %d, data %d, bss %d bytes\n",
+           s1->total_output[0], s1->total_output[1], s1->total_output[2]);
+#ifdef MEM_DEBUG
+    fprintf(stderr, "* %d bytes memory used\n", mem_max_size);
+#endif
+}

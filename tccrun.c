@@ -24,22 +24,21 @@
 #ifdef TCC_IS_NATIVE
 
 #ifdef CONFIG_TCC_BACKTRACE
-typedef struct rt_context
-{
-    /* --> tccelf.c:tcc_add_btstub wants those below in that order: */
-    Stab_Sym *stab_sym, *stab_sym_end;
-    char *stab_str;
-    ElfW(Sym) *esym_start, *esym_end;
-    char *elf_str;
-    addr_t prog_base;
-    void *bounds_start;
-    struct rt_context *next;
-    /* <-- */
-    int num_callers;
-    addr_t ip, fp, sp;
-    void *top_func;
-    jmp_buf jmp_buf;
-    char do_jmp;
+typedef struct rt_context {
+  /* --> tccelf.c:tcc_add_btstub wants those below in that order: */
+  Stab_Sym *stab_sym, *stab_sym_end;
+  char *stab_str;
+  ElfW(Sym) * esym_start, *esym_end;
+  char *elf_str;
+  addr_t prog_base;
+  void *bounds_start;
+  struct rt_context *next;
+  /* <-- */
+  int num_callers;
+  addr_t ip, fp, sp;
+  void *top_func;
+  jmp_buf jmp_buf;
+  char do_jmp;
 } rt_context;
 
 static rt_context g_rtctxt;
@@ -52,7 +51,7 @@ static void rt_exit(int code);
 #ifndef CONFIG_TCC_BACKTRACE_ONLY
 
 #ifndef _WIN32
-# include <sys/mman.h>
+#include <sys/mman.h>
 #endif
 
 static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length);
@@ -66,21 +65,20 @@ static void win64_del_function_table(void *);
 /* ------------------------------------------------------------- */
 /* Do all relocations (needed before using tcc_get_symbol())
    Returns -1 on error. */
-
 LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr)
 {
-    int size;
-    addr_t ptr_diff = 0;
+  int size;
+  addr_t ptr_diff = 0;
 
-    if (TCC_RELOCATE_AUTO != ptr)
-        return tcc_relocate_ex(s1, ptr, 0);
+  if (TCC_RELOCATE_AUTO != ptr)
+    return tcc_relocate_ex(s1, ptr, 0);
 
-    size = tcc_relocate_ex(s1, NULL, 0);
-    if (size < 0)
-        return -1;
-
+  size = tcc_relocate_ex(s1, NULL, 0);
+  if (size < 0)
+    return -1;
+  printf("relocate size:%i nbruntimemem:%i\n", size, s1->nb_runtime_mem);
 #ifdef HAVE_SELINUX
-{
+  {
     /* Using mmap instead of malloc */
     void *prx;
     char tmpfname[] = "/tmp/.tccrunXXXXXX";
@@ -88,40 +86,40 @@ LIBTCCAPI int tcc_relocate(TCCState *s1, void *ptr)
     unlink(tmpfname);
     ftruncate(fd, size);
 
-    ptr = mmap (NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    prx = mmap (NULL, size, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
+    ptr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    prx = mmap(NULL, size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
     if (ptr == MAP_FAILED || prx == MAP_FAILED)
-	tcc_error("tccrun: could not map memory");
-    dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, (void*)(addr_t)size);
+      tcc_error("tccrun: could not map memory");
+    dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, (void *)(addr_t)size);
     dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, prx);
-    ptr_diff = (char*)prx - (char*)ptr;
+    ptr_diff = (char *)prx - (char *)ptr;
     close(fd);
-}
+  }
 #else
-    ptr = tcc_malloc(size);
+  ptr = tcc_malloc(size);
 #endif
-    tcc_relocate_ex(s1, ptr, ptr_diff); /* no more errors expected */
-    dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, ptr);
-    return 0;
+  tcc_relocate_ex(s1, ptr, ptr_diff); /* no more errors expected */
+  dynarray_add(&s1->runtime_mem, &s1->nb_runtime_mem, ptr);
+  return 0;
 }
 
 ST_FUNC void tcc_run_free(TCCState *s1)
 {
-    int i;
+  int i;
 
-    for (i = 0; i < s1->nb_runtime_mem; ++i) {
+  for (i = 0; i < s1->nb_runtime_mem; ++i) {
 #ifdef HAVE_SELINUX
-        unsigned size = (unsigned)(addr_t)s1->runtime_mem[i++];
-        munmap(s1->runtime_mem[i++], size);
-        munmap(s1->runtime_mem[i], size);
+    unsigned size = (unsigned)(addr_t)s1->runtime_mem[i++];
+    munmap(s1->runtime_mem[i++], size);
+    munmap(s1->runtime_mem[i], size);
 #else
 #ifdef _WIN64
-        win64_del_function_table(*(void**)s1->runtime_mem[i]);
+    win64_del_function_table(*(void **)s1->runtime_mem[i]);
 #endif
-        tcc_free(s1->runtime_mem[i]);
+    tcc_free(s1->runtime_mem[i]);
 #endif
-    }
-    tcc_free(s1->runtime_mem);
+  }
+  tcc_free(s1->runtime_mem);
 }
 
 // static void run_cdtors(TCCState *s1, const char *start, const char *end,
@@ -206,104 +204,450 @@ ST_FUNC void tcc_run_free(TCCState *s1)
 /* To avoid that x86 processors would reload cached instructions
    each time when data is written in the near, we need to make
    sure that code and data do not share the same 64 byte unit */
- #define RUN_SECTION_ALIGNMENT 63
+#define RUN_SECTION_ALIGNMENT 63
 #else
- #define RUN_SECTION_ALIGNMENT 0
+#define RUN_SECTION_ALIGNMENT 0
 #endif
 
 /* relocate code. Return -1 on error, required size if ptr is NULL,
    otherwise copy code into buffer passed by the caller */
 static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
 {
-    Section *s;
-    unsigned offset, length, align, max_align, i, k, f;
-    addr_t mem, addr;
+  Section *s;
+  unsigned offset, length, align, max_align, i, k, f;
+  addr_t mem, addr;
 
-    if (NULL == ptr) {
-        s1->nb_errors = 0;
+  if (NULL == ptr) {
+    s1->nb_errors = 0;
 #ifdef TCC_TARGET_PE
-        pe_output_file(s1, NULL);
+    pe_output_file(s1, NULL);
 #else
-        tcc_add_runtime(s1);
-	resolve_common_syms(s1);
-        build_got_entries(s1);
-#endif
-        if (s1->nb_errors)
-            return -1;
-    }
+    tcc_add_runtime(s1);     // TODO -- this gets called multiple times - probably not good, but doesn't break anything
+    resolve_common_syms(s1); // TODO -- caused error .. didn't need it .. but should have it, same as line above
 
-    offset = max_align = 0, mem = (addr_t)ptr;
-#ifdef _WIN64
-    offset += sizeof (void*); /* space for function_table pointer */
+    build_got_entries(s1);
 #endif
-    for (k = 0; k < 2; ++k) {
-        f = 0, addr = k ? mem : mem + ptr_diff;
-        for(i = 1; i < s1->nb_sections; i++) {
-            s = s1->sections[i];
-            if (0 == (s->sh_flags & SHF_ALLOC))
-                continue;
-            if (k != !(s->sh_flags & SHF_EXECINSTR))
-                continue;
-            align = s->sh_addralign - 1;
-            if (++f == 1 && align < RUN_SECTION_ALIGNMENT)
-                align = RUN_SECTION_ALIGNMENT;
-            if (max_align < align)
-                max_align = align;
-            offset += -(addr + offset) & align;
-            s->sh_addr = mem ? addr + offset : 0;
-            offset += s->data_offset;
+    if (s1->nb_errors)
+      return -1;
+  }
+
+  offset = max_align = 0, mem = (addr_t)ptr;
+#ifdef _WIN64
+  offset += sizeof(void *); /* space for function_table pointer */
+#endif
+  for (k = 0; k < 2; ++k) {
+    f = 0, addr = k ? mem : mem + ptr_diff;
+    for (i = 1; i < s1->nb_sections; i++) {
+      s = s1->sections[i];
+      if (0 == (s->sh_flags & SHF_ALLOC))
+        continue;
+      if (k != !(s->sh_flags & SHF_EXECINSTR))
+        continue;
+      align = s->sh_addralign - 1;
+      if (++f == 1 && align < RUN_SECTION_ALIGNMENT)
+        align = RUN_SECTION_ALIGNMENT;
+      if (max_align < align)
+        max_align = align;
+      offset += -(addr + offset) & align;
+      printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
+             s1->sections[i]->data_offset, offset);
+      s->sh_addr = mem ? addr + offset : 0;
+      offset += s->data_offset;
 #if 0
             if (mem)
                 printf("%-16s %p  len %04x  align %2d\n",
                     s->name, (void*)s->sh_addr, (unsigned)s->data_offset, align + 1);
 #endif
-        }
     }
+  }
 
-    /* relocate symbols */
-    relocate_syms(s1, s1->symtab, !(s1->nostdlib));
-    if (s1->nb_errors)
-        return -1;
+  /* relocate symbols */
+  relocate_syms(s1, s1->symtab, !(s1->nostdlib));
+  if (s1->nb_errors)
+    return -1;
 
-    if (0 == mem)
-        return offset + max_align;
+  printf("offset=%i max_align=%i\n", offset, max_align);
+  if (0 == mem)
+    return offset + max_align;
 
 #ifdef TCC_TARGET_PE
-    s1->pe_imagebase = mem;
+  s1->pe_imagebase = mem;
 #endif
 
-    /* relocate each section */
-    for(i = 1; i < s1->nb_sections; i++) {
-        s = s1->sections[i];
-        if (s->reloc)
-            relocate_section(s1, s);
+  // puts("xxx");
+  /* relocate each section */
+  for (i = 1; i < s1->nb_sections; i++) {
+    s = s1->sections[i];
+    if (s->reloc) {
+      // printf("relocate-section:%i '%s'\n", i, s->name);
+      relocate_section(s1, s);
+      // puts("zzz");
     }
+  }
 #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
-    relocate_plt(s1);
+  relocate_plt(s1);
 #endif
 
-    for(i = 1; i < s1->nb_sections; i++) {
-        s = s1->sections[i];
-        if (0 == (s->sh_flags & SHF_ALLOC))
-            continue;
-        length = s->data_offset;
-        ptr = (void*)s->sh_addr;
-        if (s->sh_flags & SHF_EXECINSTR)
-            ptr = (char*)((addr_t)ptr - ptr_diff);
-        if (NULL == s->data || s->sh_type == SHT_NOBITS)
-            memset(ptr, 0, length);
-        else
-            memcpy(ptr, s->data, length);
-        /* mark executable sections as executable in memory */
-        if (s->sh_flags & SHF_EXECINSTR)
-            set_pages_executable(s1, (char*)((addr_t)ptr + ptr_diff), length);
+  for (i = 1; i < s1->nb_sections; i++) {
+    s = s1->sections[i];
+    if (0 == (s->sh_flags & SHF_ALLOC))
+      continue;
+    length = s->data_offset;
+    ptr = (void *)s->sh_addr;
+    if (s->sh_flags & SHF_EXECINSTR)
+      ptr = (char *)((addr_t)ptr - ptr_diff);
+    if (NULL == s->data || s->sh_type == SHT_NOBITS)
+      memset(ptr, 0, length);
+    else
+      memcpy(ptr, s->data, length);
+    /* mark executable sections as executable in memory */
+    printf("preexec-section:%i '%s'\n", i, s->name);
+    if (s->sh_flags & SHF_EXECINSTR) {
+      printf("exec-section:%i '%s'\n", i, s->name);
+      set_pages_executable(s1, (char *)((addr_t)ptr + ptr_diff), length);
     }
+  }
 
 #ifdef _WIN64
-    *(void**)mem = win64_add_function_table(s1);
+  *(void **)mem = win64_add_function_table(s1);
 #endif
 
+  return 0;
+}
+
+#define INTERP_RUNTIME_MEMORY_BASE_ALLOCATION 1024
+
+typedef struct TCCIRuntimeMemory {
+  unsigned allocated, size;
+  void *data;
+
+  struct {
+    unsigned capacity, count;
+    unsigned *offsets;
+  } available;
+} TCCIRuntimeMemory;
+
+typedef struct TCCIFile {
+} TCCIFile;
+
+struct TCCIFunction;
+typedef struct TCCIFunction TCCIFunction;
+
+struct TCCIFunction {
+  char *name;
+  unsigned char is_global_access;
+
+  void *runtime_ptr;
+  unsigned runtime_size;
+
+  TCCIFunction **users;
+  unsigned nb_users;
+};
+
+static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_size, void **ptr)
+{
+  // Obtain the executable block of memory
+  TCCIRuntimeMemory *rm;
+  int e = 0, ai = -1;
+  do {
+    // Obtain the next runtime memory block
+    if (e >= ds->nb_runtime_mem_blocks) {
+      rm = tcc_mallocz(sizeof(TCCIRuntimeMemory));
+      rm->allocated = INTERP_RUNTIME_MEMORY_BASE_ALLOCATION * (1 << ds->nb_runtime_mem_blocks);
+      if (rm->allocated < required_size) {
+        rm->allocated = required_size + INTERP_RUNTIME_MEMORY_BASE_ALLOCATION;
+      }
+      rm->data = tcc_malloc(rm->allocated);
+      set_pages_executable(ds->s1, (char *)rm->data, rm->allocated);
+
+      rm->available.count = 0;
+      rm->available.capacity = 32;
+      rm->available.offsets = (unsigned *)tcc_mallocz(sizeof(unsigned) * rm->available.capacity);
+
+      rm->available.offsets[rm->available.count++] = 0;
+      rm->available.offsets[rm->available.count++] = rm->allocated;
+
+      dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, rm);
+    }
+    else {
+      rm = ds->runtime_mem_blocks[ds->nb_runtime_mem_blocks - 1];
+    }
+    ++e;
+
+    // Find a fragment inside the runtime memory block large enough to allocate
+    for (ai = 0; ai < rm->available.count; ai += 2) {
+      if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] >= required_size)
+        break;
+    }
+  } while (ai < 0 || ai >= rm->available.count);
+
+  // Set the ptr
+  *ptr = (void *)((unsigned char *)rm->data + rm->available.offsets[ai]);
+
+  // Adjust the available fragment offsets collection
+  if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] > required_size) {
+    rm->available.offsets[ai] += required_size;
     return 0;
+  }
+
+  // Order doesn't matter just copy the last two values into place
+  for (e = 0; e < 2; ++e)
+    rm->available.offsets[ai + e] = rm->available.offsets[rm->available.count - 1 + e];
+  rm->available.count -= 2;
+
+  return 0;
+}
+
+static int tcci_allocate_runtime_function(TCCInterpState *ds, TCCIFile *file, ElfW(Sym) * sym, TCCIFunction **out)
+{
+  Section *strtab = ds->s1->symtab->link;
+
+  TCCIFunction *f = (TCCIFunction *)tcc_mallocz(sizeof(TCCIFunction));
+  f->name = tcc_strdup((char *)strtab->data + sym->st_name);
+  f->is_global_access = ELF64_ST_BIND(sym->st_info);
+  f->runtime_size = sym->st_size;
+
+  tcci_allocate_runtime_memory(ds, f->runtime_size, &f->runtime_ptr);
+
+  *out = f;
+  return 0;
+}
+
+LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
+{
+  TCCState *s1 = ds->s1;
+  Section *s;
+  ElfW(Sym) * sym;
+  unsigned offset, block_size, length, align, max_align, i, e, k, f;
+
+  const int TEXT_SECTION_INDEX = 1;
+
+  Section *symtab = s1->symtab;
+  Section *strtab = symtab->link;
+  int first_sym = symtab->sh_offset / sizeof(ElfSym);
+
+  // Create the file
+  // TODO -- with the first symbol of the symbol table for file name
+  TCCIFile *file_ref = NULL;
+
+  // Allocate runtime
+  int nb_syms = symtab->data_offset / sizeof(ElfSym) - first_sym;
+  printf("End_Compile: nb_syms:%i, first_sym:%i\n", nb_syms, first_sym);
+  for (int i = 0; i < nb_syms; ++i) {
+    ElfSym *sym = (ElfSym *)symtab->data + first_sym + i;
+    printf("-sym:'%s' st_type:%u st_bind:%u st_shndx:%i st_value:%lu st_size:%lu st_other:%u\n",
+           (char *)strtab->data + sym->st_name, ELF64_ST_TYPE(sym->st_info), ELF64_ST_BIND(sym->st_info), sym->st_shndx,
+           sym->st_value, sym->st_size, sym->st_other);
+
+    // if (s->reloc) {
+    //   printf(">reloc:%s\n", s->reloc->name);
+    // }
+    if (ELF64_ST_TYPE(sym->st_info) == STT_FUNC && sym->st_shndx == TEXT_SECTION_INDEX) {
+      // Allocate function entry to the interpreter state
+      TCCIFunction *ifunc;
+      tcci_allocate_runtime_function(ds, file_ref, sym, &ifunc);
+    }
+  }
+
+  // Relocate
+  // TODO
+
+  // Copy to runtime
+  // TODO
+  return -5;
+
+  //
+
+  // symtab = symtab_section;
+  // printf("symtab->data_allocated:%lu symtab->data_offset:%lu\n", symtab->data_allocated, symtab->data_offset);
+
+  // for (i = 1; i < s1->nb_sections; i++) {
+  //   s = s1->sections[i];
+  //   puts(s->name);
+  //   if (s->reloc) {
+  //     printf(">reloc:%s\n", s->reloc->name);
+  //   }
+
+  //   if (!strcmp(s->name, ".rela.text")) {
+  //     ElfW_Rel *rel = (ElfW_Rel *)(s->data + s->sh_offset);
+  //     ElfW_Rel *rel_end = (ElfW_Rel *)(s->data + s->data_offset);
+  //     for (; rel < rel_end; ++rel) {
+  //       printf("rel.sym:%li rel.type:%li rel->offset:%li rel->addend:%lu\n", ELFW(R_SYM)(rel->r_info),
+  //              ELFW(R_TYPE)(rel->r_info), rel->r_offset, rel->r_addend);
+
+  //       sym = (ElfW(Sym) *)symtab->data + ELFW(R_SYM)(rel->r_info);
+  //       printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+  //              sym->st_info, sym->st_shndx, sym->st_value);
+
+  //       // int n = ELFW(R_SYM)(rel->r_info) - first_sym;
+  //       // // if (n < 0) tcc_error("internal: invalid symbol index in relocation");
+  //       // rel->r_info = ELFW(R_INFO)(tr[n], ELFW(R_TYPE)(rel->r_info));
+  //     }
+  //   }
+  // }
+
+  // s = text_section;
+  // // printf("block_size:%u text->offset:%u\n", block_size, text->offset);
+  // printf("text->data_allocated:%lu text->data_offset:%lu\n", s->data_allocated, s->data_offset);
+
+  //   ElfW(Sym) * sym;
+  //   int sym_bind, sh_num;
+  //   const char *name;
+
+  // for_each_elem(symtab, 1, sym, ElfW(Sym))
+  //   {
+  //     printf("<<<<%li>>>>\n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)));
+  //     sh_num = sym->st_shndx;
+  //     if (sh_num == SHN_UNDEF) {
+  // name = (char *)s1->symtab->link->data + sym->st_name;
+  //       /* Use ld.so to resolve symbol for us (for tcc -run) */
+  //       if (do_resolve) {
+  // #if defined TCC_IS_NATIVE && !defined TCC_TARGET_PE
+  // #ifdef TCC_TARGET_MACHO
+  //         /* The symbols in the symtables have a prepended '_'
+  //            but dlsym() needs the undecorated name.  */
+  //         void *addr = dlsym(RTLD_DEFAULT, name + 1);
+  // #else
+  //         void *addr = dlsym(RTLD_DEFAULT, name);
+  // #endif
+  //         if (addr) {
+  //           sym->st_value = (addr_t)addr;
+  // #ifdef DEBUG_RELOC
+  //           printf("relocate_sym: '%s' -> 0x%lx\n", name, sym->st_value);
+  // #endif
+  //           goto found;
+  //         }
+  // #endif
+  //         /* if dynamic symbol exist, it will be used in relocate_section */
+  //       }
+  //       else if (s1->dynsym && find_elf_sym(s1->dynsym, name))
+  //         goto found;
+  //       /* XXX: _fp_hw seems to be part of the ABI, so we ignore
+  //          it */
+  //       if (!strcmp(name, "_fp_hw"))
+  //         goto found;
+  //       /* only weak symbols are accepted to be undefined. Their
+  //          value is zero */
+  //       sym_bind = ELFW(ST_BIND)(sym->st_info);
+  //       if (sym_bind == STB_WEAK)
+  //         sym->st_value = 0;
+  //       else
+  //         tcc_error_noabort("undefined symbol '%s'", name);
+  //     }
+  //     else if (sh_num < SHN_LORESERVE) {
+  //       /* add section base */
+  //       printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+  //       sym->st_info,
+  //              sym->st_shndx, sym->st_value);
+  //       printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
+  //              s1->sections[sym->st_shndx]->sh_addr);
+  //       sym->st_value += s1->sections[sym->st_shndx]->sh_addr;
+  //     }
+  //     found: ;
+  //   }
+
+  // // Determine the size required by the unresolved symbols
+  // for (k = 0; k < 2; ++k) {
+  //   // f = 0, addr = k ? mem : mem + ptr_diff;
+  //   for (i = 1; i < s1->nb_sections; i++) {
+  //     s = s1->sections[i];
+
+  //     if (0 == (s->sh_flags & SHF_ALLOC))
+  //       continue;
+  //     if (k != !(s->sh_flags & SHF_EXECINSTR))
+  //       continue;
+
+  //     if (s == text_section)
+  //       continue;
+
+  //     puts(s->name);
+  //     return -5;
+  //   }
+  // align = s->sh_addralign - 1;
+  // if (++f == 1 && align < RUN_SECTION_ALIGNMENT)
+  // align = RUN_SECTION_ALIGNMENT;
+  // if (max_align < align)
+  // max_align = align;
+  // offset += -(addr + offset) & align;
+  //       printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
+  //              s1->sections[i]->data_offset, offset);
+  //       s->sh_addr = mem ? addr + offset : 0;
+  //       offset += s->data_offset;
+  // }
+
+  //   for (k = 0; k < 2; ++k) {
+  //     f = 0, addr = k ? mem : mem + ptr_diff;
+  //     for (i = 1; i < s1->nb_sections; i++) {
+  //       s = s1->sections[i];
+  //       if (0 == (s->sh_flags & SHF_ALLOC))
+  //         continue;
+  //       if (k != !(s->sh_flags & SHF_EXECINSTR))
+  //         continue;
+  //       align = s->sh_addralign - 1;
+  //       if (++f == 1 && align < RUN_SECTION_ALIGNMENT)
+  //         align = RUN_SECTION_ALIGNMENT;
+  //       if (max_align < align)
+  //         max_align = align;
+  //       offset += -(addr + offset) & align;
+  //       printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
+  //              s1->sections[i]->data_offset, offset);
+  //       s->sh_addr = mem ? addr + offset : 0;
+  //       offset += s->data_offset;
+  // #if 0
+  //             if (mem)
+  //                 printf("%-16s %p  len %04x  align %2d\n",
+  //                     s->name, (void*)s->sh_addr, (unsigned)s->data_offset, align + 1);
+  // #endif
+  //     }
+  //   }
+
+  //   /* relocate symbols */
+  // relocate_syms(s1, s1->symtab, !(s1->nostdlib));
+  //   if (s1->nb_errors)
+  //     return -1;
+
+  //   printf("offset=%i max_align=%i\n", offset, max_align);
+  //   if (0 == mem)
+  //     return offset + max_align;
+
+  // #ifdef TCC_TARGET_PE
+  //   s1->pe_imagebase = mem;
+  // #endif
+
+  //   // puts("xxx");
+  //   /* relocate each section */
+  //   for (i = 1; i < s1->nb_sections; i++) {
+  //     s = s1->sections[i];
+  //     if (s->reloc) {
+  //       // printf("relocate-section:%i '%s'\n", i, s->name);
+  // relocate_section(s1, s);
+  //       // puts("zzz");
+  //     }
+  //   }
+  // #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
+  //   relocate_plt(s1);
+  // #endif
+
+  //   for (i = 1; i < s1->nb_sections; i++) {
+  //     s = s1->sections[i];
+  //     if (0 == (s->sh_flags & SHF_ALLOC))
+  //       continue;
+  //     length = s->data_offset;
+  //     ptr = (void *)s->sh_addr;
+  //     if (s->sh_flags & SHF_EXECINSTR)
+  //       ptr = (char *)((addr_t)ptr - ptr_diff);
+  //     if (NULL == s->data || s->sh_type == SHT_NOBITS)
+  //       memset(ptr, 0, length);
+  //     else
+  //       memcpy(ptr, s->data, length);
+  //     /* mark executable sections as executable in memory */
+  //     printf("preexec-section:%i '%s'\n", i, s->name);
+  //     if (s->sh_flags & SHF_EXECINSTR) {
+  //       printf("exec-section:%i '%s'\n", i, s->name);
+  //       set_pages_executable(s1, (char *)((addr_t)ptr + ptr_diff), length);
+  //     }
+
+  return 0;
 }
 
 /* ------------------------------------------------------------- */
@@ -312,24 +656,24 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
 static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 {
 #ifdef _WIN32
-    unsigned long old_protect;
-    VirtualProtect(ptr, length, PAGE_EXECUTE_READWRITE, &old_protect);
+  unsigned long old_protect;
+  VirtualProtect(ptr, length, PAGE_EXECUTE_READWRITE, &old_protect);
 #else
-    void __clear_cache(void *beginning, void *end);
-# ifndef HAVE_SELINUX
-    addr_t start, end;
-#  ifndef PAGESIZE
-#   define PAGESIZE 4096
-#  endif
-    start = (addr_t)ptr & ~(PAGESIZE - 1);
-    end = (addr_t)ptr + length;
-    end = (end + PAGESIZE - 1) & ~(PAGESIZE - 1);
-    if (mprotect((void *)start, end - start, PROT_READ | PROT_WRITE | PROT_EXEC))
-        tcc_error("mprotect failed: did you mean to configure --with-selinux?");
-# endif
-# if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64
-    __clear_cache(ptr, (char *)ptr + length);
-# endif
+  void __clear_cache(void *beginning, void *end);
+#ifndef HAVE_SELINUX
+  addr_t start, end;
+#ifndef PAGESIZE
+#define PAGESIZE 4096
+#endif
+  start = (addr_t)ptr & ~(PAGESIZE - 1);
+  end = (addr_t)ptr + length;
+  end = (end + PAGESIZE - 1) & ~(PAGESIZE - 1);
+  if (mprotect((void *)start, end - start, PROT_READ | PROT_WRITE | PROT_EXEC))
+    tcc_error("mprotect failed: did you mean to configure --with-selinux?");
+#endif
+#if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64
+  __clear_cache(ptr, (char *)ptr + length);
+#endif
 #endif
 }
 
@@ -356,7 +700,7 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 //     }
 // }
 #endif
-#endif //ndef CONFIG_TCC_BACKTRACE_ONLY
+#endif // ndef CONFIG_TCC_BACKTRACE_ONLY
 /* ------------------------------------------------------------- */
 #ifdef CONFIG_TCC_BACKTRACE
 
@@ -596,12 +940,12 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 // /* ------------------------------------------------------------- */
 
 #ifndef _WIN32
-# include <signal.h>
-# ifndef __OpenBSD__
-#  include <sys/ucontext.h>
-# endif
+#include <signal.h>
+#ifndef __OpenBSD__
+#include <sys/ucontext.h>
+#endif
 #else
-# define ucontext_t CONTEXT
+#define ucontext_t CONTEXT
 #endif
 
 // /* translate from ucontext_t* to internal rt_context * */
@@ -702,7 +1046,7 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 // }
 
 #ifndef SA_SIGINFO
-# define SA_SIGINFO 0x00000004u
+#define SA_SIGINFO 0x00000004u
 #endif
 
 // /* Generate a stack backtrace when a CPU exception occurs. */
@@ -883,7 +1227,6 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 //     char *str;
 //     void *ptr;
 // } TCCSyms;
-
 
 // /* add the symbol you want here if no dynamic linking is done */
 // static TCCSyms tcc_syms[] = {

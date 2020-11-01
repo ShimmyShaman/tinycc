@@ -233,10 +233,13 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr, addr_t 
             long long diff;
             diff = (long long)val - addr;
             if (diff < -2147483648LL || diff > 2147483647LL) {
+                printf ("%lu %lu %lli\n", val, addr, diff);
                 tcc_error("internal error: relocation failed");
             }
+        puts("kkk");
             add32le(ptr, diff);
         }
+        puts("aaa");
             break;
 
         case R_X86_64_PLTOFF64:
