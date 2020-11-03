@@ -301,10 +301,31 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
     else
       memcpy(ptr, s->data, length);
     /* mark executable sections as executable in memory */
-    printf("preexec-section:%i '%s'\n", i, s->name);
+    printf("preexec-section:%i '%s' (void *)s->sh_addr:%p\n", i, s->name, (void *)s->sh_addr);
     if (s->sh_flags & SHF_EXECINSTR) {
       printf("exec-section:%i '%s'\n", i, s->name);
       set_pages_executable(s1, (char *)((addr_t)ptr + ptr_diff), length);
+    }
+    for (int b = 0; b < length;) {
+      printf("      ");
+      for (int bi = 0; bi < 8 && b < length; ++bi, ++b) {
+        printf(" %02x", *((u_char *)((addr_t)ptr + ptr_diff) + b));
+      }
+      puts("\n");
+    }
+  }
+
+  {
+    ElfW(Sym) * sym;
+    for_each_elem(symtab_section, 1, sym, ElfW(Sym))
+    {
+      if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
+        printf("\nalpha3(%lu bytes):", sym->st_size);
+        for (int b = 0; b < (int)sym->st_size; ++b) {
+          printf("%x ", *(text_section->data + b));
+        }
+        puts("\n");
+      }
     }
   }
 
@@ -319,7 +340,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
 
 typedef struct TCCIRuntimeMemory {
   unsigned allocated, size;
-  void *data;
+  u_char *data;
 
   struct {
     unsigned capacity, count;
@@ -335,16 +356,16 @@ typedef struct TCCIFunction TCCIFunction;
 
 struct TCCIFunction {
   char *name;
-  unsigned char is_global_access;
+  u_char is_global_access;
 
-  void *runtime_ptr;
+  u_char *runtime_ptr;
   unsigned runtime_size;
 
   TCCIFunction **users;
   unsigned nb_users;
 };
 
-static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_size, void **ptr)
+static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_size, u_char **ptr)
 {
   // Obtain the executable block of memory
   TCCIRuntimeMemory *rm;
@@ -358,7 +379,7 @@ static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_si
         rm->allocated = required_size + INTERP_RUNTIME_MEMORY_BASE_ALLOCATION;
       }
       rm->data = tcc_malloc(rm->allocated);
-      set_pages_executable(ds->s1, (char *)rm->data, rm->allocated);
+      set_pages_executable(ds->s1, (void *)rm->data, rm->allocated);
 
       rm->available.count = 0;
       rm->available.capacity = 32;
@@ -382,7 +403,7 @@ static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_si
   } while (ai < 0 || ai >= rm->available.count);
 
   // Set the ptr
-  *ptr = (void *)((unsigned char *)rm->data + rm->available.offsets[ai]);
+  *ptr = (u_char *)rm->data + rm->available.offsets[ai];
 
   // Adjust the available fragment offsets collection
   if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] > required_size) {
@@ -419,6 +440,7 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
   Section *s;
   ElfW(Sym) * sym;
   unsigned offset, block_size, length, align, max_align, i, e, k, f;
+  u_char *ptr;
 
   const int TEXT_SECTION_INDEX = 1;
 
@@ -430,8 +452,130 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
   // TODO -- with the first symbol of the symbol table for file name
   TCCIFile *file_ref = NULL;
 
+  // Build global offset table
+  build_got_entries(s1);
+
+  // Relocate symbols
+  for_each_elem(symtab, 1, sym, ElfW(Sym))
+  {
+    if (sym->st_shndx == SHN_UNDEF) {
+      printf("-sym:'%s' SHN_UNDEF st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+             sym->st_info, sym->st_shndx, sym->st_value);
+      char *sym_name = (char *)s1->symtab->link->data + sym->st_name;
+      /* Use ld.so to resolve symbol for us (for tcc -run) */
+      if (1) {
+#if defined TCC_IS_NATIVE && !defined TCC_TARGET_PE
+#ifdef TCC_TARGET_MACHO
+        /* The symbols in the symtables have a prepended '_'
+           but dlsym() needs the undecorated name.  */
+        void *addr = dlsym(RTLD_DEFAULT, name + 1);
+#else
+        void *addr = dlsym(RTLD_DEFAULT, sym_name);
+#endif
+        if (addr) {
+          sym->st_value = (addr_t)addr;
+          // #ifdef DEBUG_RELOC
+          printf("relocate_sym: '%s' -> 0x%lx\n", sym_name, sym->st_value);
+          // #endif
+          goto found;
+        }
+#endif
+        /* if dynamic symbol exist, it will be used in relocate_section */
+      }
+      else if (s1->dynsym && find_elf_sym(s1->dynsym, sym_name))
+        goto found;
+      /* XXX: _fp_hw seems to be part of the ABI, so we ignore
+         it */
+      if (!strcmp(sym_name, "_fp_hw"))
+        goto found;
+      /* only weak symbols are accepted to be undefined. Their
+         value is zero */
+      unsigned sym_bind = ELFW(ST_BIND)(sym->st_info);
+      if (sym_bind == STB_WEAK)
+        sym->st_value = 0;
+      else
+        tcc_error_noabort("undefined symbol '%s'", sym_name);
+    }
+    else if (sym->st_shndx < SHN_LORESERVE) {
+      // /* add section base */
+      printf("-sym:'%s' SHN_LORESERVE st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+             sym->st_info, sym->st_shndx, sym->st_value);
+      // printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
+      //        s1->sections[sym->st_shndx]->sh_addr);
+
+      // if (!strcmp((char *)symtab->link->data + sym->st_name, "alpha")) {
+      //   printf("\nalpha(%lu bytes):", sym->st_size);
+      //   for (int b = 0; b < (int)sym->st_size; ++b) {
+      //     printf("%x ", *(text_section->data + b));
+      //   }
+      //   puts("\n");
+      // }
+
+      sym->st_value += s1->sections[sym->st_shndx]->sh_addr;
+      // ++s1->nb_symtab_reloc_syms;
+    }
+  found:;
+  }
+
+  // Relocate symbols
+  for (i = 1; i < s1->nb_sections; i++) {
+    s = s1->sections[i];
+    if (s->reloc) {
+      printf(">reloc:%s\n", s->reloc->name);
+      Section *sr = s->reloc;
+      ElfW_Rel *rel;
+      int type, sym_index;
+      addr_t tgt, addr;
+
+      qrel = (ElfW_Rel *)sr->data;
+
+      for_each_elem(sr, 0, rel, ElfW_Rel)
+      {
+        ptr = s->data + rel->r_offset;
+        sym_index = ELFW(R_SYM)(rel->r_info);
+        sym = &((ElfW(Sym) *)symtab->data)[sym_index];
+        type = ELFW(R_TYPE)(rel->r_info);
+        tgt = sym->st_value;
+#if SHT_RELX == SHT_RELA
+        tgt += rel->r_addend;
+#endif
+        addr = s->sh_addr + rel->r_offset;
+        printf(">rela:%i-'%s' type:%i ptr:%p addr:%p sym->st_value:%lu(%p) tgt:%p\n", sym_index,
+               (char *)strtab->data + sym->st_name, type, ptr, (void *)addr, sym->st_value, (void *)sym->st_value,
+               (void *)tgt);
+
+        //         // printf("before:%p\n", *(void * *)ptr);
+        // relocate(s1, rel, type, ptr, addr, tgt);
+        //         // printf("after:%p\n", *(void * *)ptr);
+        //       }
+
+        //       /* if the relocation is allocated, we change its symbol table */
+        //       if (sr->sh_flags & SHF_ALLOC) {
+        //         sr->link = s1->dynsym;
+        //         if (s1->output_type == TCC_OUTPUT_DLL) {
+        //           size_t r = (uint8_t *)qrel - sr->data;
+        //           if (sizeof((Stab_Sym *)0)->n_value < PTR_SIZE && 0 == strcmp(s->name, ".stab"))
+        //             r = 0; /* cannot apply 64bit relocation to 32bit value */
+        //           sr->data_offset = sr->sh_size = r;
+        //         }
+      }
+    }
+  }
+
+#if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
+  relocate_plt(s1);
+#endif
+  addr_t ptr_diff = 0; /* Selinux thing */
+
   // Allocate runtime
   int nb_syms = symtab->data_offset / sizeof(ElfSym) - first_sym;
+
+  int nb_func_copies = 0;
+  struct {
+    TCCIFunction *ifunc;
+    Elf64_Addr src_offset;
+  } pending_func_copies[nb_syms];
+
   printf("End_Compile: nb_syms:%i, first_sym:%i\n", nb_syms, first_sym);
   for (int i = 0; i < nb_syms; ++i) {
     ElfSym *sym = (ElfSym *)symtab->data + first_sym + i;
@@ -439,20 +583,69 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
            (char *)strtab->data + sym->st_name, ELF64_ST_TYPE(sym->st_info), ELF64_ST_BIND(sym->st_info), sym->st_shndx,
            sym->st_value, sym->st_size, sym->st_other);
 
-    // if (s->reloc) {
-    //   printf(">reloc:%s\n", s->reloc->name);
-    // }
     if (ELF64_ST_TYPE(sym->st_info) == STT_FUNC && sym->st_shndx == TEXT_SECTION_INDEX) {
       // Allocate function entry to the interpreter state
-      TCCIFunction *ifunc;
-      tcci_allocate_runtime_function(ds, file_ref, sym, &ifunc);
+      tcci_allocate_runtime_function(ds, file_ref, sym, &pending_func_copies[nb_func_copies].ifunc);
+      pending_func_copies[nb_func_copies++].src_offset = sym->st_value;
     }
   }
-
-  // Relocate
-  // TODO
+  for (i = 0; i < nb_func_copies; ++i) {
+    printf("%s: ", pending_func_copies[i].ifunc->name);
+    for (int b = 0; b < pending_func_copies[i].ifunc->runtime_size; ++b) {
+      printf("%x ", *(text_section->data + b));
+    }
+    puts("");
+  }
 
   // Copy to runtime
+  for (i = 0; i < nb_func_copies; ++i) {
+    memcpy(pending_func_copies[i].ifunc->runtime_ptr, text_section->data + pending_func_copies[i].src_offset,
+           pending_func_copies[i].ifunc->runtime_size);
+
+    void *addr = dlsym(RTLD_DEFAULT, "puts");
+    if (addr) {
+      // sym->st_value = (addr_t)addr;
+      // #ifdef DEBUG_RELOC
+      printf("puts: -> %p\n", addr);
+      // add32le(pending_func_copies[i].ifunc->runtime_ptr + 14, addr);
+    }
+
+    printf("%s: ", pending_func_copies[i].ifunc->name);
+    for (int b = 0; b < pending_func_copies[i].ifunc->runtime_size; ++b) {
+      printf("%x ", *(text_section->data + b));
+    }
+    puts("");
+
+    void (*ff)(void) = (void *)pending_func_copies[i].ifunc->runtime_ptr;
+    puts("calling...");
+    // add32le()
+    ff();
+    puts("end");
+  }
+
+  // for (i = 1; i < s1->nb_sections; i++) {
+  //   s = s1->sections[i];
+  //   if (0 == (s->sh_flags & SHF_ALLOC))
+  //     continue;
+  //   length = s->data_offset;
+  //   ptr = (void *)s->sh_addr;
+  //   if (s->sh_flags & SHF_EXECINSTR)
+  //     ptr = (char *)((addr_t)ptr - ptr_diff);
+
+  //   printf("section:'%s' s->data:%p s->sh_type:%i length:%lu\n", s->name, s->data, s->sh_type, s->data_offset);
+  //   if (NULL == s->data || s->sh_type == SHT_NOBITS)
+  //     memset(ptr, 0, length);
+  //   else
+  //     memcpy(ptr, s->data, length);
+  //   puts("fff");
+  //   /* mark executable sections as executable in memory */
+  //   printf("preexec-section:%i '%s'\n", i, s->name);
+  //   if (s->sh_flags & SHF_EXECINSTR) {
+  //     printf("exec-section:%i '%s'\n", i, s->name);
+  //     set_pages_executable(s1, (char *)((addr_t)ptr + ptr_diff), length);
+  //   }
+  // }
+
   // TODO
   return -5;
 
