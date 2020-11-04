@@ -261,6 +261,8 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
     }
   }
 
+  printf("##'L.0' [before relocate_syms] st_value=%p\n",
+         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)].st_value);
   /* relocate symbols */
   relocate_syms(s1, s1->symtab, !(s1->nostdlib));
   if (s1->nb_errors)
@@ -274,6 +276,8 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
   s1->pe_imagebase = mem;
 #endif
 
+  printf("##'L.0' [before relocate_sections] st_value=%p\n",
+         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)].st_value);
   // puts("xxx");
   /* relocate each section */
   for (i = 1; i < s1->nb_sections; i++) {
@@ -284,6 +288,8 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
       // puts("zzz");
     }
   }
+  printf("##'L.0' [before relocate_plt] st_value=%p\n",
+         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)].st_value);
 #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
   relocate_plt(s1);
 #endif
@@ -354,12 +360,27 @@ typedef struct TCCIFile {
 struct TCCIFunction;
 typedef struct TCCIFunction TCCIFunction;
 
+typedef struct TCCIFuncRel {
+  // offset in the function
+  uint32_t func_offset;
+
+  // offset in plt
+  uint32_t plt_offset;
+
+  // the symbol strtab-name index and type (r_info)
+  uint32_t symbol_strindex;
+
+} TCCIFuncRel;
+
 struct TCCIFunction {
   char *name;
   u_char is_global_access;
 
   u_char *runtime_ptr;
   unsigned runtime_size;
+
+  unsigned nb_relocs;
+  ElfW_Rel *relocs;
 
   TCCIFunction **users;
   unsigned nb_users;
@@ -454,6 +475,9 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
 
   // Build global offset table
   build_got_entries(s1);
+  ds->got.offset = 0U;
+  ds->got.allocated = 1024; // TODO
+  ds->got.ptr = tcc_malloc(ds->got.allocated);
 
   // Relocate symbols
   for_each_elem(symtab, 1, sym, ElfW(Sym))
@@ -500,8 +524,8 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
       // /* add section base */
       printf("-sym:'%s' SHN_LORESERVE st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
              sym->st_info, sym->st_shndx, sym->st_value);
-      // printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
-      //        s1->sections[sym->st_shndx]->sh_addr);
+      printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
+             s1->sections[sym->st_shndx]->sh_addr);
 
       // if (!strcmp((char *)symtab->link->data + sym->st_name, "alpha")) {
       //   printf("\nalpha(%lu bytes):", sym->st_size);
@@ -564,6 +588,9 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
 
 #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
   relocate_plt(s1);
+  ds->plt.offset = 0U;
+  ds->plt.allocated = 1024; // TODO
+  ds->plt.ptr = tcc_malloc(ds->plt.allocated);
 #endif
   addr_t ptr_diff = 0; /* Selinux thing */
 
@@ -598,29 +625,86 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
   }
 
   // Copy to runtime
+  TCCIFuncRel func_rels[1024];
+  int nb_func_rels;
+
   for (i = 0; i < nb_func_copies; ++i) {
+    printf("\nCopying function '%s' from %p\n", pending_func_copies[i].ifunc->name,
+           text_section->data + pending_func_copies[i].src_offset);
     memcpy(pending_func_copies[i].ifunc->runtime_ptr, text_section->data + pending_func_copies[i].src_offset,
            pending_func_copies[i].ifunc->runtime_size);
 
-    void *addr = dlsym(RTLD_DEFAULT, "puts");
-    if (addr) {
-      // sym->st_value = (addr_t)addr;
-      // #ifdef DEBUG_RELOC
-      printf("puts: -> %p\n", addr);
-      // add32le(pending_func_copies[i].ifunc->runtime_ptr + 14, addr);
+    // Append Relocations
+    nb_func_rels = 0;
+    {
+      // printf(">reloc:%s\n", text_section->reloc->name);
+      Section *sr = text_section->reloc;
+      ElfW_Rel *rel;
+      int type, sym_index;
+      addr_t tgt, addr;
+
+      qrel = (ElfW_Rel *)sr->data;
+
+      for_each_elem(sr, 0, rel, ElfW_Rel)
+      {
+        long long diff = (long long)rel->r_offset - pending_func_copies[i].src_offset;
+        if (diff < 0 || diff >= pending_func_copies[i].ifunc->runtime_size)
+          continue;
+
+        sym_index = ELFW(R_SYM)(rel->r_info);
+        sym = &((ElfW(Sym) *)symtab->data)[sym_index];
+        type = ELFW(R_TYPE)(rel->r_info);
+
+        TCCIFuncRel *fr = &func_rels[nb_func_rels++];
+        fr->func_offset = (uint32_t)diff;
+        fr->plt_offset = (uint32_t)((long long)sym->st_value - (long long)s1->plt->data);
+        fr->symbol_strindex = (uint32_t)sym->st_name;
+
+        printf("diff:%u(%p) sym->st_value:%p, s1->plt->data:%p\n", fr->plt_offset, (void *)fr->plt_offset, (void *)sym->st_value, s1->plt->data);
+        printf("funcrel func_offset:%u plt_offset:%u sym_name_index:%u ('%s')\n", fr->func_offset, fr->plt_offset,
+               fr->symbol_strindex, (char *)strtab->data + fr->symbol_strindex);
+
+        // offset in the function
+        // offset in plt
+        // the symbol strtab-name index and type (r_info)
+
+        // if(rel->r_offset <  pending_func_copies[i].src_offset)
+
+        //         ptr = s->data + rel->r_offset;
+        //         sym_index = ELFW(R_SYM)(rel->r_info);
+        //         sym = &((ElfW(Sym) *)symtab->data)[sym_index];
+        //         type = ELFW(R_TYPE)(rel->r_info);
+        //         tgt = sym->st_value;
+        // #if SHT_RELX == SHT_RELA
+        //         tgt += rel->r_addend;
+        // #endif
+        //         addr = s->sh_addr + rel->r_offset;
+
+        //         printf(">rela:%i-'%s' type:%i ptr:%p addr:%p sym->st_value:%lu(%p) tgt:%p\n", sym_index,
+        //                (char *)strtab->data + sym->st_name, type, ptr, (void *)addr, sym->st_value, (void
+        //                *)sym->st_value, (void *)tgt);
+      }
     }
 
-    printf("%s: ", pending_func_copies[i].ifunc->name);
-    for (int b = 0; b < pending_func_copies[i].ifunc->runtime_size; ++b) {
-      printf("%x ", *(text_section->data + b));
-    }
-    puts("");
+    // void *addr = dlsym(RTLD_DEFAULT, "puts");
+    // if (addr) {
+    //   // sym->st_value = (addr_t)addr;
+    //   // #ifdef DEBUG_RELOC
+    //   printf("puts: -> %p\n", addr);
+    //   // add32le(pending_func_copies[i].ifunc->runtime_ptr + 14, addr);
+    // }
 
-    void (*ff)(void) = (void *)pending_func_copies[i].ifunc->runtime_ptr;
-    puts("calling...");
-    // add32le()
-    ff();
-    puts("end");
+    // printf("%s: ", pending_func_copies[i].ifunc->name);
+    // for (int b = 0; b < pending_func_copies[i].ifunc->runtime_size; ++b) {
+    //   printf("%x ", *(text_section->data + b));
+    // }
+    // puts("");
+
+    // void (*ff)(void) = (void *)pending_func_copies[i].ifunc->runtime_ptr;
+    // puts("calling...");
+    // // add32le()
+    // ff();
+    // puts("end");
   }
 
   // for (i = 1; i < s1->nb_sections; i++) {
