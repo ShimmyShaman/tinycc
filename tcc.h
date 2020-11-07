@@ -948,11 +948,23 @@ struct TCCState {
     char **argv;
 };
 
+typedef struct TCCISymbol {
+  char *name;
+  u_char binding;
+  u_char type;
+  Elf64_Addr addr;
+
+  unsigned nb_got_users;
+  void **got_users;
+} TCCISymbol;
+
 struct TCCInterpState {
     TCCState *s1;
 
     void **runtime_mem_blocks; /* pointer to execution text blocks */
     int nb_runtime_mem_blocks; /* number thereof */
+    struct TCCISymbol **symbols; /* pointer to execution text blocks */
+    int nb_symbols; /* number thereof */
 
     struct {
         unsigned offset, allocated;

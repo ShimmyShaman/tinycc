@@ -967,6 +967,132 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
   }
 }
 
+/* relocate symbol table, resolve undefined symbols if do_resolve is
+   true and output error if undefined symbol. */
+ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_resolve, int set_resolve)
+{
+  TCCState *s1 = ds->s1;
+  // {
+  //     Section *sec = s1->symtab;
+  //    int first_sym = sec->sh_offset / sizeof (ElfSym);
+  //    int  nb_syms = sec->data_offset / sizeof (ElfSym) - first_sym;
+  //     printf("End_Compile: nb_syms:%i, first_sym:%i\n", nb_syms,first_sym);
+  //     for (int i = 0; i < nb_syms; ++i) {
+  //         ElfSym *sym = (ElfSym*)sec->data + first_sym + i;
+  //     printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char*)sec->link->data + sym->st_name, sym->st_info,
+  //     sym->st_shndx, sym->st_value);
+  //     }}
+  ElfW(Sym) * sym;
+  int sym_bind, sh_num;
+  const char *name;
+
+  for_each_elem(symtab, 1, sym, ElfW(Sym))
+  {
+    printf("<<<<%li>>>>\n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)));
+    sh_num = sym->st_shndx;
+    if (sh_num == SHN_UNDEF) {
+      printf("-sym:'%s' SHN_UNDEF st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+             sym->st_info, sym->st_shndx, sym->st_value);
+      name = (char *)s1->symtab->link->data + sym->st_name;
+      /* Use ld.so to resolve symbol for us (for tcc -run) */
+      if (do_resolve) {
+        if (!set_resolve)
+          goto found;
+#if defined TCC_IS_NATIVE && !defined TCC_TARGET_PE
+#ifdef TCC_TARGET_MACHO
+        /* The symbols in the symtables have a prepended '_'
+           but dlsym() needs the undecorated name.  */
+        void *addr = dlsym(RTLD_DEFAULT, name + 1);
+#else
+        void *addr = dlsym(RTLD_DEFAULT, name);
+#endif
+        if (addr) {
+          sym->st_value = (addr_t)addr;
+#ifdef DEBUG_RELOC
+          printf("external_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
+#endif
+          goto found;
+        }
+        else {
+          if (!set_resolve)
+            goto found;
+          for (int a = 0; a < ds->nb_symbols; ++a) {
+            if (!strcmp(ds->symbols[a]->name, name)) {
+              printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
+              sym->st_value = ds->symbols[a]->addr;
+              printf("interp_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
+
+              // Find the GOT global addr
+              // s1->got->reloc
+              // TODO performance improvements
+
+              ElfW_Rel *rel;
+              for_each_elem(s1->got->reloc, 0, rel, ElfW_Rel)
+              {
+                int rel_sym_index = ELFW(R_SYM)(rel->r_info);
+                ElfW(Sym) * rel_sym;
+                rel_sym = &((ElfW(Sym) *)symtab_section->data)[rel_sym_index];
+
+                if (!strcmp(name, (char *)symtab_section->link->data + rel_sym->st_name)) {
+                  void *tgt = (void *)((u_char *)s1->got->sh_addr + rel->r_offset);
+                  // printf("GOT: sec:%s sym:%s shndx:%u index:%i addr:%p rel_offset:%p\n", s1->got->reloc->name,
+                  //        (char *)symtab_section->link->data + rel_sym->st_name, rel_sym->st_shndx, got_reloc_index,
+                  //        tgt, rel->r_offset);
+
+                  // TODO -- Do not allow redefinition of a function (IF it redefines the parameter signature) without
+                  // delivering a warning NO further checking will be done or ensured - It will be assumed the user
+                  // knows of all function calls and has fixed them prior
+
+                  // TODO -- make this collection a hash-set
+                  dynarray_add(&ds->symbols[a]->got_users, &ds->symbols[a]->nb_got_users, tgt);
+                  goto found;
+                }
+              }
+              tcc_error_noabort("could not find got-entry for usage of symbol '%s'", name);
+            }
+          }
+        }
+#endif
+        /* if dynamic symbol exist, it will be used in relocate_section */
+      }
+      else if (s1->dynsym && find_elf_sym(s1->dynsym, name))
+        goto found;
+      /* XXX: _fp_hw seems to be part of the ABI, so we ignore
+         it */
+      if (!strcmp(name, "_fp_hw"))
+        goto found;
+      /* only weak symbols are accepted to be undefined. Their
+         value is zero */
+      sym_bind = ELFW(ST_BIND)(sym->st_info);
+      if (sym_bind == STB_WEAK)
+        sym->st_value = 0;
+      else {
+
+        tcc_error_noabort("undefined symbol '%s'", name);
+      }
+    }
+    else if (sh_num < SHN_LORESERVE) {
+      /* add section base */
+      printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name, sym->st_info,
+             sym->st_shndx, sym->st_value);
+      printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
+             s1->sections[sym->st_shndx]->sh_addr);
+
+      if (!strcmp((char *)symtab->link->data + sym->st_name, "alpha")) {
+        printf("\nalpha(%lu bytes):", sym->st_size);
+        for (int b = 0; b < (int)sym->st_size; ++b) {
+          printf("%x ", *(text_section->data + b));
+        }
+        puts("\n");
+      }
+
+      sym->st_value += s1->sections[sym->st_shndx]->sh_addr;
+      ++s1->nb_symtab_reloc_syms;
+    }
+  found:;
+  }
+}
+
 /* relocate a given section (CPU dependent) by applying the relocations
    in the associated relocation section */
 ST_FUNC void relocate_section(TCCState *s1, Section *s)
@@ -987,7 +1113,7 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
       if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
         printf("\nalpha2(%lu bytes):", sym->st_size);
         for (int b = 0; b < (int)sym->st_size; ++b) {
-          printf("%x ", *(text_section->data + b));
+          printf("%x ", *(text_section->data + 36 + b));
         }
         puts("\n\n");
       }
@@ -1016,7 +1142,7 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
         if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
           printf("alpha2(%lu bytes):", sym->st_size);
           for (int b = 0; b < (int)sym->st_size; ++b) {
-            printf("%x ", *(text_section->data + b));
+            printf("%x ", *(text_section->data + 36 + b));
           }
           puts("\n\n");
         }
@@ -1233,6 +1359,9 @@ ST_FUNC void build_got_entries(TCCState *s1)
         tcc_error("Unknown relocation type for got: %d", type);
       sym_index = ELFW(R_SYM)(rel->r_info);
       sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
+
+      printf("GOT: sec:%s sym:%s shndx:%u reltype:%i\n", s->name, (char *)symtab_section->link->data + sym->st_name,
+             sym->st_shndx, type);
 
       if (gotplt_entry == NO_GOTPLT_ENTRY) {
         continue;

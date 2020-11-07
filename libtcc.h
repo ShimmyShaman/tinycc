@@ -106,7 +106,6 @@ LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name);
 LIBTCCAPI void tcc_list_symbols(TCCState *s, void *ctx,
                                 void (*symbol_cb)(void *ctx, const char *name, const void *val));
 
-
 struct TCCInterpState;
 typedef struct TCCInterpState TCCInterpState;
 
@@ -117,10 +116,11 @@ LIBTCCINTERPAPI TCCInterpState *tcc_interp_new(void);
 LIBTCCINTERPAPI void tcc_interp_delete(TCCInterpState *ds);
 
 /* compile & link a c-code file-like declaration */
-LIBTCCINTERPAPI int tcc_interpret_string(TCCInterpState *ds, const char *filename, int line_offset,
-                                              const char *str);
+LIBTCCINTERPAPI int tcc_interpret_file(TCCInterpState *ds, const char *filename, const char *str);
 
 LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds);
+
+LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_name);
 
 #ifdef __cplusplus
 }
