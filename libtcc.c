@@ -741,16 +741,20 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd)
 
 LIBTCCAPI int tcc_compile_string(TCCState *s, const char *str) { return tcc_compile(s, s->filetype, str, -1); }
 
+void tcci_handle_error(void *opaque, const char *msg) { fprintf(opaque, "%s\n", msg); }
+
 LIBTCCINTERPAPI int tcc_interpret_file(TCCInterpState *ds, const char *filename, const char *str)
 {
   ds->s1 = tcc_new();
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
+  tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
 
   int res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
   if (res)
     return res;
 
-  res = tcci_update_symbols(ds);
+  puts("...Relocating...");
+  res = tcci_relocate_into_memory(ds);
 
   tcc_delete(ds->s1);
 
@@ -1041,7 +1045,7 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
 }
 
 /* create a new TCC interpretation context */
-LIBTCCINTERPAPI TCCInterpState *tcc_interp_new(void)
+LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
   TCCInterpState *ds = tcc_mallocz(sizeof(TCCInterpState));
   // ds->s1 = tcc_new();
@@ -1049,8 +1053,9 @@ LIBTCCINTERPAPI TCCInterpState *tcc_interp_new(void)
 }
 
 /* free a TCC interpretation context */
-LIBTCCINTERPAPI void tcc_interp_delete(TCCInterpState *ds)
+LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
 {
+  printf("tcci final mem size:%lu\n", ds->runtime_mem_size);
   // tcc_delete(ds->s1);
   for (int a = 0; a < ds->nb_runtime_mem_blocks; ++a) {
     free(ds->runtime_mem_blocks[a]);

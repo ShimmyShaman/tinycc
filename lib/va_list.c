@@ -11,7 +11,7 @@ enum __va_arg_type {
 };
 
 /* GCC compatible definition of va_list. */
-/*predefined by TCC (tcc_predefs.h):
+/*predefined by TCC (tcc_predefs.h):*/
 typedef struct {
     unsigned int gp_offset;
     unsigned int fp_offset;
@@ -21,7 +21,7 @@ typedef struct {
     };
     char *reg_save_area;
 } __builtin_va_list[1];
-*/
+
 
 extern void *memcpy(void *dest, const void *src, unsigned long n);
 

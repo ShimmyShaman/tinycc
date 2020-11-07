@@ -963,6 +963,7 @@ struct TCCInterpState {
 
     void **runtime_mem_blocks; /* pointer to execution text blocks */
     int nb_runtime_mem_blocks; /* number thereof */
+    uint64_t runtime_mem_size;
     struct TCCISymbol **symbols; /* pointer to execution text blocks */
     int nb_symbols; /* number thereof */
 
@@ -974,7 +975,6 @@ struct TCCInterpState {
         unsigned offset, allocated;
         uint8_t *ptr;
     }plt;
-
 };
 
 struct filespec {

@@ -430,8 +430,8 @@ ST_FUNC int put_elf_sym(Section *s, addr_t value, unsigned long size, int info, 
   sym->st_other = other;
   sym->st_shndx = shndx;
   sym_index = sym - (ElfW(Sym) *)s->data;
-  printf("put_elf_sym:>[%s] '%s''%s' %lu\n", s->name, (name == NULL ? "(null)" : name),
-         (char *)s->link->data + sym->st_name, sym->st_value);
+  // printf("put_elf_sym:>[%s] '%s''%s' %lu\n", s->name, (name == NULL ? "(null)" : name),
+  //        (char *)s->link->data + sym->st_name, sym->st_value);
   hs = s->hash;
   if (hs) {
     int *ptr, *base;
@@ -648,7 +648,7 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size, int info, 
   if (sym_bind != STB_LOCAL) {
     /* we search global or weak symbols */
     sym_index = find_elf_sym(s, name);
-    printf("%i = find_elf_sym(%s);\n", sym_index, name);
+    // printf("%i = find_elf_sym(%s);\n", sym_index, name);
     if (!sym_index)
       goto do_def;
     esym = &((ElfW(Sym) *)s->data)[sym_index];

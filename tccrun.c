@@ -360,9 +360,6 @@ typedef struct TCCIRuntimeMemory {
 typedef struct TCCIFile {
 } TCCIFile;
 
-struct TCCIFunction;
-typedef struct TCCIFunction TCCIFunction;
-
 typedef struct TCCIFuncRel {
   // offset in the function
   uint32_t func_offset;
@@ -375,88 +372,88 @@ typedef struct TCCIFuncRel {
 
 } TCCIFuncRel;
 
-struct TCCIFunction {
-  char *name;
-  u_char is_global_access;
+// typedef struct TCCIFunction {
+//   char *name;
+//   u_char is_global_access;
 
-  u_char *runtime_ptr;
-  unsigned runtime_size;
+//   // u_char *runtime_ptr;
+//   unsigned runtime_size;
 
-  unsigned nb_relocs;
-  ElfW_Rel *relocs;
+//   unsigned nb_relocs;
+//   ElfW_Rel *relocs;
 
-  TCCIFunction **users;
-  unsigned nb_users;
-};
+//   TCCIFunction **users;
+//   unsigned nb_users;
+// } TCCIFunction;
 
-static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_size, u_char **ptr)
-{
-  // Obtain the executable block of memory
-  TCCIRuntimeMemory *rm;
-  int e = 0, ai = -1;
-  do {
-    // Obtain the next runtime memory block
-    if (e >= ds->nb_runtime_mem_blocks) {
-      rm = tcc_mallocz(sizeof(TCCIRuntimeMemory));
-      rm->allocated = INTERP_RUNTIME_MEMORY_BASE_ALLOCATION * (1 << ds->nb_runtime_mem_blocks);
-      if (rm->allocated < required_size) {
-        rm->allocated = required_size + INTERP_RUNTIME_MEMORY_BASE_ALLOCATION;
-      }
-      rm->data = tcc_malloc(rm->allocated);
-      set_pages_executable(ds->s1, (void *)rm->data, rm->allocated);
+// static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_size, u_char **ptr)
+// {
+//   // Obtain the executable block of memory
+//   TCCIRuntimeMemory *rm;
+//   int e = 0, ai = -1;
+//   do {
+//     // Obtain the next runtime memory block
+//     if (e >= ds->nb_runtime_mem_blocks) {
+//       rm = tcc_mallocz(sizeof(TCCIRuntimeMemory));
+//       rm->allocated = INTERP_RUNTIME_MEMORY_BASE_ALLOCATION * (1 << ds->nb_runtime_mem_blocks);
+//       if (rm->allocated < required_size) {
+//         rm->allocated = required_size + INTERP_RUNTIME_MEMORY_BASE_ALLOCATION;
+//       }
+//       rm->data = tcc_malloc(rm->allocated);
+//       set_pages_executable(ds->s1, (void *)rm->data, rm->allocated);
 
-      rm->available.count = 0;
-      rm->available.capacity = 32;
-      rm->available.offsets = (unsigned *)tcc_mallocz(sizeof(unsigned) * rm->available.capacity);
+//       rm->available.count = 0;
+//       rm->available.capacity = 32;
+//       rm->available.offsets = (unsigned *)tcc_mallocz(sizeof(unsigned) * rm->available.capacity);
 
-      rm->available.offsets[rm->available.count++] = 0;
-      rm->available.offsets[rm->available.count++] = rm->allocated;
+//       rm->available.offsets[rm->available.count++] = 0;
+//       rm->available.offsets[rm->available.count++] = rm->allocated;
 
-      dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, rm);
-    }
-    else {
-      rm = ds->runtime_mem_blocks[ds->nb_runtime_mem_blocks - 1];
-    }
-    ++e;
+//       dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, rm);
+//     }
+//     else {
+//       rm = ds->runtime_mem_blocks[ds->nb_runtime_mem_blocks - 1];
+//     }
+//     ++e;
 
-    // Find a fragment inside the runtime memory block large enough to allocate
-    for (ai = 0; ai < rm->available.count; ai += 2) {
-      if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] >= required_size)
-        break;
-    }
-  } while (ai < 0 || ai >= rm->available.count);
+//     // Find a fragment inside the runtime memory block large enough to allocate
+//     for (ai = 0; ai < rm->available.count; ai += 2) {
+//       if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] >= required_size)
+//         break;
+//     }
+//   } while (ai < 0 || ai >= rm->available.count);
 
-  // Set the ptr
-  *ptr = (u_char *)rm->data + rm->available.offsets[ai];
+//   // Set the ptr
+//   *ptr = (u_char *)rm->data + rm->available.offsets[ai];
 
-  // Adjust the available fragment offsets collection
-  if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] > required_size) {
-    rm->available.offsets[ai] += required_size;
-    return 0;
-  }
+//   // Adjust the available fragment offsets collection
+//   if (rm->available.offsets[ai + 1] - rm->available.offsets[ai] > required_size) {
+//     rm->available.offsets[ai] += required_size;
+//     return 0;
+//   }
 
-  // Order doesn't matter just copy the last two values into place
-  for (e = 0; e < 2; ++e)
-    rm->available.offsets[ai + e] = rm->available.offsets[rm->available.count - 1 + e];
-  rm->available.count -= 2;
+//   // Order doesn't matter just copy the last two values into place
+//   for (e = 0; e < 2; ++e)
+//     rm->available.offsets[ai + e] = rm->available.offsets[rm->available.count - 1 + e];
+//   rm->available.count -= 2;
 
-  return 0;
-}
+//   return 0;
+// }
 
-static int tcci_allocate_runtime_function(TCCInterpState *ds, TCCIFile *file, ElfW(Sym) * sym, TCCIFunction **out)
-{
-  Section *strtab = ds->s1->symtab->link;
+// static int tcci_allocate_runtime_function(TCCInterpState *ds, TCCIFile *file, ElfW(Sym) * sym, TCCIFunction **out)
+// {
+//   Section *strtab = ds->s1->symtab->link;
 
-  TCCIFunction *f = (TCCIFunction *)tcc_mallocz(sizeof(TCCIFunction));
-  f->name = tcc_strdup((char *)strtab->data + sym->st_name);
-  f->is_global_access = ELF64_ST_BIND(sym->st_info);
-  f->runtime_size = sym->st_size;
+//   TCCIFunction *f = (TCCIFunction *)tcc_mallocz(sizeof(TCCIFunction));
+//   f->name = tcc_strdup((char *)strtab->data + sym->st_name);
+//   f->is_global_access = ELF64_ST_BIND(sym->st_info);
+//   f->runtime_size = sym->st_size;
 
-  tcci_allocate_runtime_memory(ds, f->runtime_size, &f->runtime_ptr);
+//   // tcci_allocate_runtime_memory(ds, f->runtime_size, &f->runtime_ptr);
 
-  *out = f;
-  return 0;
-}
+//   *out = f;
+//   return 0;
+// }
 
 void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding, u_char type, Elf64_Addr addr)
 {
@@ -490,7 +487,7 @@ void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding
   }
 }
 
-LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
+LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 {
   usleep(100000);
   puts("\n####################\n\n");
@@ -551,6 +548,8 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
 
   printf("offset=%i max_align=%i\n", offset, max_align);
   void *ptr = tcc_malloc(offset + max_align);
+  dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, ptr);
+  ds->runtime_mem_size += (uint64_t)offset + max_align;
   printf("ptr @%p allocated:%i\n", ptr, offset + max_align);
 
   offset = max_align = 0, mem = (addr_t)ptr;
@@ -922,7 +921,6 @@ LIBTCCINTERPAPI int tcci_update_symbols(TCCInterpState *ds)
 
 /* ------------------------------------------------------------- */
 /* allow to run code in memory */
-
 static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 {
 #ifdef _WIN32
