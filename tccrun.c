@@ -249,8 +249,8 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
       if (max_align < align)
         max_align = align;
       offset += -(addr + offset) & align;
-      printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
-             s1->sections[i]->data_offset, offset);
+      // printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
+      //        s1->sections[i]->data_offset, offset);
       s->sh_addr = mem ? addr + offset : 0;
       offset += s->data_offset;
 #if 0
@@ -261,9 +261,9 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
     }
   }
 
-  printf("##'L.0' [before relocate_syms] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_syms] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
   /* relocate symbols */
   relocate_syms(s1, s1->symtab, !(s1->nostdlib));
   if (s1->nb_errors)
@@ -277,9 +277,9 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
   s1->pe_imagebase = mem;
 #endif
 
-  printf("##'L.0' [before relocate_sections] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_sections] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
   // puts("xxx");
   /* relocate each section */
   for (i = 1; i < s1->nb_sections; i++) {
@@ -290,9 +290,9 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
       // puts("zzz");
     }
   }
-  printf("##'L.0' [before relocate_plt] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_plt] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
 #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
   relocate_plt(s1);
 #endif
@@ -310,33 +310,33 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
     else
       memcpy(ptr, s->data, length);
     /* mark executable sections as executable in memory */
-    printf("preexec-section:%i '%s' (void *)s->sh_addr:%p\n", i, s->name, (void *)s->sh_addr);
+    // printf("preexec-section:%i '%s' (void *)s->sh_addr:%p\n", i, s->name, (void *)s->sh_addr);
     if (s->sh_flags & SHF_EXECINSTR) {
-      printf("exec-section:%i '%s'\n", i, s->name);
+      // printf("exec-section:%i '%s'\n", i, s->name);
       set_pages_executable(s1, (char *)((addr_t)ptr + ptr_diff), length);
     }
-    for (int b = 0; b < length;) {
-      printf("      ");
-      for (int bi = 0; bi < 8 && b < length; ++bi, ++b) {
-        printf(" %02x", *((u_char *)((addr_t)ptr + ptr_diff) + b));
-      }
-      puts("\n");
-    }
+    // for (int b = 0; b < length;) {
+    //   printf("      ");
+    //   for (int bi = 0; bi < 8 && b < length; ++bi, ++b) {
+    //     printf(" %02x", *((u_char *)((addr_t)ptr + ptr_diff) + b));
+    //   }
+    //   puts("\n");
+    // }
   }
 
-  {
-    ElfW(Sym) * sym;
-    for_each_elem(symtab_section, 1, sym, ElfW(Sym))
-    {
-      if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
-        printf("\nalpha3(%lu bytes):", sym->st_size);
-        for (int b = 0; b < (int)sym->st_size; ++b) {
-          printf("%x ", *(text_section->data + b));
-        }
-        puts("\n");
-      }
-    }
-  }
+  // {
+  //   ElfW(Sym) * sym;
+  //   for_each_elem(symtab_section, 1, sym, ElfW(Sym))
+  //   {
+  //     if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
+  //       printf("\nalpha3(%lu bytes):", sym->st_size);
+  //       for (int b = 0; b < (int)sym->st_size; ++b) {
+  //         printf("%x ", *(text_section->data + b));
+  //       }
+  //       puts("\n");
+  //     }
+  //   }
+  // }
 
 #ifdef _WIN64
   *(void **)mem = win64_add_function_table(s1);
@@ -506,7 +506,7 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
   build_got_entries(s1);
 #endif
   if (s1->nb_errors)
-    return -1;
+    return 1;
 
   offset = max_align = 0, mem = (addr_t)NULL;
 #ifdef _WIN64
@@ -538,13 +538,13 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     }
   }
 
-  printf("##'L.0' [before relocate_syms] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_syms] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
   /* relocate symbols */
   tcci_relocate_syms(ds, s1->symtab, !(s1->nostdlib), 0);
   if (s1->nb_errors)
-    return -1;
+    return 2;
 
   printf("offset=%i max_align=%i\n", offset, max_align);
   void *ptr = tcc_malloc(offset + max_align);
@@ -582,21 +582,21 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     }
   }
 
-  printf("##'L.0' [before relocate_syms] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_syms] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
   /* relocate symbols */
   tcci_relocate_syms(ds, s1->symtab, !(s1->nostdlib), 1);
   if (s1->nb_errors)
-    return -1;
+    return 3;
 
 #ifdef TCC_TARGET_PE
   s1->pe_imagebase = mem;
 #endif
 
-  printf("##'L.0' [before relocate_sections] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_sections] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
   // puts("xxx");
   /* relocate each section */
   for (i = 1; i < s1->nb_sections; i++) {
@@ -607,9 +607,9 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
       // puts("zzz");
     }
   }
-  printf("##'L.0' [before relocate_plt] st_value=%p\n",
-         (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
-             .st_value);
+  // printf("##'L.0' [before relocate_plt] st_value=%p\n",
+  //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
+  //            .st_value);
 #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
   relocate_plt(s1);
 #endif
@@ -627,18 +627,18 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     else
       memcpy(ptr, s->data, length);
     /* mark executable sections as executable in memory */
-    printf("preexec-section:%i '%s' (void *)s->sh_addr:%p\n", i, s->name, (void *)s->sh_addr);
+    // printf("preexec-section:%i '%s' (void *)s->sh_addr:%p\n", i, s->name, (void *)s->sh_addr);
     if (s->sh_flags & SHF_EXECINSTR) {
-      printf("exec-section:%i '%s'\n", i, s->name);
+      // printf("exec-section:%i '%s'\n", i, s->name);
       set_pages_executable(s1, (char *)((addr_t)ptr + 0 /*ptr_diff*/), length);
     }
-    for (int b = 0; b < length;) {
-      printf("      ");
-      for (int bi = 0; bi < 8 && b < length; ++bi, ++b) {
-        printf(" %02x", *((u_char *)((addr_t)ptr + 0 /*ptr_diff*/) + b));
-      }
-      puts("\n");
-    }
+    // for (int b = 0; b < length;) {
+    //   printf("      ");
+    //   for (int bi = 0; bi < 8 && b < length; ++bi, ++b) {
+    //     printf(" %02x", *((u_char *)((addr_t)ptr + 0 /*ptr_diff*/) + b));
+    //   }
+    //   puts("\n");
+    // }
   }
 
   // Copy Info to ds from s1
@@ -656,10 +656,10 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     if (s1->sections[sym->st_shndx] != text_section)
       continue;
 
-    printf("<sym[%li]'%s'> \n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)),
-           (char *)symtab->link->data + sym->st_name);
-    printf("binding:%u type:%u st_shndx:%u st_value:%p\n", binding, type, sym->st_shndx,
-           (void *)sym->st_value /*s1->sections[sym->st_shndx]->name,  */);
+    // printf("<sym[%li]'%s'> \n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)),
+    //        (char *)symtab->link->data + sym->st_name);
+    // printf("binding:%u type:%u st_shndx:%u st_value:%p\n", binding, type, sym->st_shndx,
+    //        (void *)sym->st_value /*s1->sections[sym->st_shndx]->name,  */);
 
     tcci_set_global_symbol(ds, (char *)symtab->link->data + sym->st_name, binding, type, sym->st_value);
   }

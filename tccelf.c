@@ -988,11 +988,11 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
 
   for_each_elem(symtab, 1, sym, ElfW(Sym))
   {
-    printf("<<<<%li>>>>\n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)));
+    // printf("<<<<%li>>>>\n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)));
     sh_num = sym->st_shndx;
     if (sh_num == SHN_UNDEF) {
-      printf("-sym:'%s' SHN_UNDEF st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
-             sym->st_info, sym->st_shndx, sym->st_value);
+      // printf("-sym:'%s' SHN_UNDEF st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+      //        sym->st_info, sym->st_shndx, sym->st_value);
       name = (char *)s1->symtab->link->data + sym->st_name;
       /* Use ld.so to resolve symbol for us (for tcc -run) */
       if (do_resolve) {
@@ -1073,18 +1073,19 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
     }
     else if (sh_num < SHN_LORESERVE) {
       /* add section base */
-      printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name, sym->st_info,
-             sym->st_shndx, sym->st_value);
-      printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
-             s1->sections[sym->st_shndx]->sh_addr);
+      // printf("-sym:'%s' st_info:%u st_shndx:%i st_value:%lu\n", (char *)symtab->link->data + sym->st_name,
+      // sym->st_info,
+      //        sym->st_shndx, sym->st_value);
+      // printf("s1->sections[%i]('%s')->sh_addr:%lu\n", sym->st_shndx, s1->sections[sym->st_shndx]->name,
+      //        s1->sections[sym->st_shndx]->sh_addr);
 
-      if (!strcmp((char *)symtab->link->data + sym->st_name, "alpha")) {
-        printf("\nalpha(%lu bytes):", sym->st_size);
-        for (int b = 0; b < (int)sym->st_size; ++b) {
-          printf("%x ", *(text_section->data + b));
-        }
-        puts("\n");
-      }
+      // if (!strcmp((char *)symtab->link->data + sym->st_name, "alpha")) {
+      //   printf("\nalpha(%lu bytes):", sym->st_size);
+      //   for (int b = 0; b < (int)sym->st_size; ++b) {
+      //     printf("%x ", *(text_section->data + b));
+      //   }
+      //   puts("\n");
+      // }
 
       sym->st_value += s1->sections[sym->st_shndx]->sh_addr;
       ++s1->nb_symtab_reloc_syms;
@@ -1106,19 +1107,19 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
 
   qrel = (ElfW_Rel *)sr->data;
 
-  {
-    ElfW(Sym) * sym;
-    for_each_elem(symtab_section, 1, sym, ElfW(Sym))
-    {
-      if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
-        printf("\nalpha2(%lu bytes):", sym->st_size);
-        for (int b = 0; b < (int)sym->st_size; ++b) {
-          printf("%x ", *(text_section->data + 36 + b));
-        }
-        puts("\n\n");
-      }
-    }
-  }
+  // {
+  //   ElfW(Sym) * sym;
+  //   for_each_elem(symtab_section, 1, sym, ElfW(Sym))
+  //   {
+  //     if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
+  //       printf("\nalpha2(%lu bytes):", sym->st_size);
+  //       for (int b = 0; b < (int)sym->st_size; ++b) {
+  //         printf("%x ", *(text_section->data + 36 + b));
+  //       }
+  //       puts("\n\n");
+  //     }
+  //   }
+  // }
 
   for_each_elem(sr, 0, rel, ElfW_Rel)
   {
@@ -1131,25 +1132,25 @@ ST_FUNC void relocate_section(TCCState *s1, Section *s)
     tgt += rel->r_addend;
 #endif
     addr = s->sh_addr + rel->r_offset;
-    printf("rela:%i-'%s' [%s] type:%i ptr:%p addr:%p sym->st_value:%lu(%p) tgt:%p rel->r_addend:%p\n", sym_index,
-           (char *)s1->symtab->link->data + sym->st_name, s->name, type, ptr, (void *)addr, sym->st_value,
-           (void *)sym->st_value, (void *)tgt, (void *)rel->r_addend);
+    // printf("rela:%i-'%s' [%s] type:%i ptr:%p addr:%p sym->st_value:%lu(%p) tgt:%p rel->r_addend:%p\n", sym_index,
+    //        (char *)s1->symtab->link->data + sym->st_name, s->name, type, ptr, (void *)addr, sym->st_value,
+    //        (void *)sym->st_value, (void *)tgt, (void *)rel->r_addend);
     relocate(s1, rel, type, ptr, addr, tgt);
-    {
-      ElfW(Sym) * sym;
-      for_each_elem(symtab_section, 1, sym, ElfW(Sym))
-      {
-        if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
-          printf("alpha2(%lu bytes):", sym->st_size);
-          for (int b = 0; b < (int)sym->st_size; ++b) {
-            printf("%x ", *(text_section->data + 36 + b));
-          }
-          puts("\n\n");
-        }
-      }
-    }
+    // {
+    //   ElfW(Sym) * sym;
+    //   for_each_elem(symtab_section, 1, sym, ElfW(Sym))
+    //   {
+    //     if (!strcmp((char *)symtab_section->link->data + sym->st_name, "alpha")) {
+    //       printf("alpha2(%lu bytes):", sym->st_size);
+    //       for (int b = 0; b < (int)sym->st_size; ++b) {
+    //         printf("%x ", *(text_section->data + 36 + b));
+    //       }
+    //       puts("\n\n");
+    //     }
+    //   }
+    // }
   }
-  puts("fff");
+  // puts("fff");
   /* if the relocation is allocated, we change its symbol table */
   if (sr->sh_flags & SHF_ALLOC) {
     sr->link = s1->dynsym;
@@ -1360,8 +1361,8 @@ ST_FUNC void build_got_entries(TCCState *s1)
       sym_index = ELFW(R_SYM)(rel->r_info);
       sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
 
-      printf("GOT: sec:%s sym:%s shndx:%u reltype:%i\n", s->name, (char *)symtab_section->link->data + sym->st_name,
-             sym->st_shndx, type);
+      // printf("GOT: sec:%s sym:%s shndx:%u reltype:%i\n", s->name, (char *)symtab_section->link->data + sym->st_name,
+      //        sym->st_shndx, type);
 
       if (gotplt_entry == NO_GOTPLT_ENTRY) {
         continue;

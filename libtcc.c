@@ -771,6 +771,29 @@ LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_nam
   return NULL;
 }
 
+LIBTCCINTERPAPI void *tcci_add_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
+{
+  TCCISymbol *sym = NULL;
+  for (int i = 0; i < ds->nb_symbols; ++i) {
+    if (!strcmp(symbol_name, ds->symbols[i]->name)) {
+      puts("ERR: Symbol already exists! What do?");
+    }
+  }
+
+  if (!sym) {
+    sym = tcc_mallocz(sizeof(TCCISymbol));
+    sym->name = tcc_strdup(symbol_name);
+
+    printf(">>>>> added new symbol for '%s' @ %p\n", symbol_name, (void *)addr);
+    dynarray_add(&ds->symbols, &ds->nb_symbols, sym);
+  }
+
+  // Set Properties
+  sym->binding = STB_GLOBAL;
+  sym->type = STT_FUNC;
+  sym->addr = (addr_t)addr;
+}
+
 /* define a preprocessor symbol. value can be NULL, sym can be "sym=val" */
 LIBTCCAPI void tcc_define_symbol(TCCState *s1, const char *sym, const char *value)
 {
