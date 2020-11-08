@@ -967,6 +967,9 @@ struct TCCInterpState {
     struct TCCISymbol **symbols; /* pointer to execution text blocks */
     int nb_symbols; /* number thereof */
 
+    char **include_paths;
+    int nb_include_paths;
+
     struct {
         unsigned offset, allocated;
         uint8_t *ptr;

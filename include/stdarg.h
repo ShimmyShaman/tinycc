@@ -1,6 +1,16 @@
 #ifndef _STDARG_H
 #define _STDARG_H
 
+typedef struct {
+    unsigned int gp_offset;
+    unsigned int fp_offset;
+    union {
+        unsigned int overflow_offset;
+        char *overflow_arg_area;
+    };
+    char *reg_save_area;
+} __builtin_va_list[1];
+
 typedef __builtin_va_list va_list;
 #define va_start __builtin_va_start
 #define va_arg __builtin_va_arg

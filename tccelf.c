@@ -1009,7 +1009,7 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
         if (addr) {
           sym->st_value = (addr_t)addr;
 #ifdef DEBUG_RELOC
-          printf("external_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
+          // printf("external_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
 #endif
           goto found;
         }
@@ -1018,9 +1018,9 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
             goto found;
           for (int a = 0; a < ds->nb_symbols; ++a) {
             if (!strcmp(ds->symbols[a]->name, name)) {
-              printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
+              // printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
               sym->st_value = ds->symbols[a]->addr;
-              printf("interp_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
+              // printf("interp_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
 
               // Find the GOT global addr
               // s1->got->reloc

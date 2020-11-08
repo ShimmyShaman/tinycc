@@ -155,36 +155,36 @@ ST_FUNC void relocate_plt(TCCState *s1)
     if (!s1->plt)
       return;
       
-puts(":plt:");
-    for (int b = 0; b < s1->plt->data_offset;) {
-      printf("      ");
-      for (int bi = 0; bi < 8 && b < s1->plt->data_offset; ++bi, ++b) {
-        printf(" %02x", *((u_char *)(s1->plt->data + b)));
-      }
-      puts("\n");
-    }
+// puts(":plt:");
+//     for (int b = 0; b < s1->plt->data_offset;) {
+//       printf("      ");
+//       for (int bi = 0; bi < 8 && b < s1->plt->data_offset; ++bi, ++b) {
+//         printf(" %02x", *((u_char *)(s1->plt->data + b)));
+//       }
+//       puts("\n");
+//     }
     p = s1->plt->data;
     p_end = p + s1->plt->data_offset;
 
     if (p < p_end) {
         int x = s1->got->sh_addr - s1->plt->sh_addr - 6;
-        printf("[p(%p) + 2, x(%i)\n", (void *)p, x);
+        // printf("[p(%p) + 2, x(%i)\n", (void *)p, x);
         add32le(p + 2, x);
         add32le(p + 8, x - 6);
-        printf("[p(%p) + 8, x(%i)\n", (void *)p, x - 6);
+        // printf("[p(%p) + 8, x(%i)\n", (void *)p, x - 6);
         p += 16;
         while (p < p_end) {
             add32le(p + 2, x + (s1->plt->data - p));
             p += 16;
         }
     }
-    for (int b = 0; b < s1->plt->data_offset;) {
-      printf("      ");
-      for (int bi = 0; bi < 8 && b < s1->plt->data_offset; ++bi, ++b) {
-        printf(" %02x", *((u_char *)(s1->plt->data + b)));
-      }
-      puts("\n");
-    }
+    // for (int b = 0; b < s1->plt->data_offset;) {
+    //   printf("      ");
+    //   for (int bi = 0; bi < 8 && b < s1->plt->data_offset; ++bi, ++b) {
+    //     printf(" %02x", *((u_char *)(s1->plt->data + b)));
+    //   }
+    //   puts("\n");
+    // }
 }
 #endif
 #endif
@@ -249,7 +249,7 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr, addr_t 
         {
             long long diff;
             diff = (long long)val - addr;
-                printf ("%p %p %lli\n", (void *)val, (void *)addr, diff);
+                // printf ("%p %p %lli\n", (void *)val, (void *)addr, diff);
             if (diff < -2147483648LL || diff > 2147483647LL) {
                 tcc_error("internal error: relocation failed");
             }

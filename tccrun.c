@@ -269,7 +269,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, addr_t ptr_diff)
   if (s1->nb_errors)
     return -1;
 
-  printf("offset=%i max_align=%i\n", offset, max_align);
+  // printf("offset=%i max_align=%i\n", offset, max_align);
   if (0 == mem)
     return offset + max_align;
 
@@ -479,18 +479,17 @@ void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding
   sym->type = type;
   sym->addr = addr;
 
-  printf("has %u users>\n", sym->nb_got_users);
-  for (int b = 0; b < sym->nb_got_users; ++b) {
-    printf("--%p  before:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
-    *(void **)sym->got_users[b] = (void *)addr;
-    printf("--%p  after:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
-  }
+  // printf("has %u users>\n", sym->nb_got_users);
+  // for (int b = 0; b < sym->nb_got_users; ++b) {
+  //   printf("--%p  before:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
+  //   *(void **)sym->got_users[b] = (void *)addr;
+  //   printf("--%p  after:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
+  // }
 }
 
 LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 {
   usleep(100000);
-  puts("\n####################\n\n");
   TCCState *s1 = ds->s1;
   Section *s;
   unsigned offset, length, align, max_align, i, k, f;
@@ -526,8 +525,8 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
       if (max_align < align)
         max_align = align;
       offset += -(addr + offset) & align;
-      printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
-             s1->sections[i]->data_offset, offset);
+      // printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
+      //        s1->sections[i]->data_offset, offset);
       s->sh_addr = mem ? addr + offset : 0;
       offset += s->data_offset;
 #if 0
@@ -546,11 +545,11 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
   if (s1->nb_errors)
     return 2;
 
-  printf("offset=%i max_align=%i\n", offset, max_align);
+  // printf("offset=%i max_align=%i\n", offset, max_align);
   void *ptr = tcc_malloc(offset + max_align);
   dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, ptr);
   ds->runtime_mem_size += (uint64_t)offset + max_align;
-  printf("ptr @%p allocated:%i\n", ptr, offset + max_align);
+  // printf("ptr @%p allocated:%i\n", ptr, offset + max_align);
 
   offset = max_align = 0, mem = (addr_t)ptr;
 #ifdef _WIN64
@@ -570,8 +569,8 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
       if (max_align < align)
         max_align = align;
       offset += -(addr + offset) & align;
-      printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
-             s1->sections[i]->data_offset, offset);
+      // printf("rex0, s1->sections[%i]('%s')->data_offset:%lu %i\n", i, s1->sections[i]->name,
+      //        s1->sections[i]->data_offset, offset);
       s->sh_addr = mem ? addr + offset : 0;
       offset += s->data_offset;
 #if 0

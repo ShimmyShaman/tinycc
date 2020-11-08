@@ -743,15 +743,97 @@ LIBTCCAPI int tcc_compile_string(TCCState *s, const char *str) { return tcc_comp
 
 void tcci_handle_error(void *opaque, const char *msg) { fprintf(opaque, "%s\n", msg); }
 
-LIBTCCINTERPAPI int tcc_interpret_file(TCCInterpState *ds, const char *filename, const char *str)
+LIBTCCAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathname)
 {
+  char *path_dup = tcc_strdup(pathname);
+  dynarray_add(&ds->include_paths, &ds->nb_include_paths, path_dup);
+  return 0;
+}
+
+/* create a new TCC interpretation context */
+LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
+{
+  TCCInterpState *ds = tcc_mallocz(sizeof(TCCInterpState));
+  // ds->s1 = tcc_new();
+  return ds;
+}
+
+/* free a TCC interpretation context */
+LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
+{
+  printf("tcci final mem size:%lu\n", ds->runtime_mem_size);
+  // tcc_delete(ds->s1);
+  for (int a = 0; a < ds->nb_runtime_mem_blocks; ++a) {
+    free(ds->runtime_mem_blocks[a]);
+  }
+  free(ds->runtime_mem_blocks);
+
+  for (int a = 0; a < ds->nb_symbols; ++a) {
+    TCCISymbol *sym = ds->symbols[a];
+    free(sym->name);
+    free(sym);
+  }
+  free(ds->symbols);
+
+  for (int a = 0; a < ds->nb_include_paths; ++a) {
+    free(ds->include_paths[a]);
+  }
+  free(ds->include_paths);
+
+  free(ds);
+}
+
+LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, const char *str)
+{
+  int res;
   ds->s1 = tcc_new();
+  for (int a = 0; a < ds->nb_include_paths; ++a) {
+    res = tcc_add_include_path(ds->s1, ds->include_paths[a]);
+    if (res) {
+      puts("ERR[793]"); // TODO
+      return res;
+    }
+  }
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
   tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
 
-  int res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
+  res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
   if (res)
     return res;
+
+  puts("...Relocating...");
+  res = tcci_relocate_into_memory(ds);
+
+  tcc_delete(ds->s1);
+
+  return res;
+}
+
+LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsigned nb_files)
+{
+  int res;
+
+  ds->s1 = tcc_new();
+  for (int a = 0; a < ds->nb_include_paths; ++a) {
+    res = tcc_add_include_path(ds->s1, ds->include_paths[a]);
+    if (res) {
+      puts("ERR[793]"); // TODO
+      return res;
+    }
+  }
+  tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
+  tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
+
+  for (unsigned a = 0; a < nb_files; ++a) {
+    res = tcc_add_file(ds->s1, files[a]);
+    if (res) {
+      puts("ERR[831]: tcc_add_file"); // TODO
+      return res;
+    }
+
+    // tcc_add_file_internal(ds->s1, files[a], AFF_PRINT_ERROR | AFF_TYPE_C);
+    // tcc_compile(ds->s1, AFF_PRINT_ERROR | AFF_TYPE_C, files[a], 0);
+  }
 
   puts("...Relocating...");
   res = tcci_relocate_into_memory(ds);
@@ -1065,34 +1147,6 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
   if (0 == --nb_states)
     tcc_memcheck();
 #endif
-}
-
-/* create a new TCC interpretation context */
-LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
-{
-  TCCInterpState *ds = tcc_mallocz(sizeof(TCCInterpState));
-  // ds->s1 = tcc_new();
-  return ds;
-}
-
-/* free a TCC interpretation context */
-LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
-{
-  printf("tcci final mem size:%lu\n", ds->runtime_mem_size);
-  // tcc_delete(ds->s1);
-  for (int a = 0; a < ds->nb_runtime_mem_blocks; ++a) {
-    free(ds->runtime_mem_blocks[a]);
-  }
-  free(ds->runtime_mem_blocks);
-
-  for (int a = 0; a < ds->nb_symbols; ++a) {
-    TCCISymbol *sym = ds->symbols[a];
-    free(sym->name);
-    free(sym);
-  }
-  free(ds->symbols);
-
-  free(ds);
 }
 
 LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)

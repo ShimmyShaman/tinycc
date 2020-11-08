@@ -10,17 +10,17 @@ enum __va_arg_type {
     __va_gen_reg, __va_float_reg, __va_stack
 };
 
-/* GCC compatible definition of va_list. */
-/*predefined by TCC (tcc_predefs.h):*/
-typedef struct {
-    unsigned int gp_offset;
-    unsigned int fp_offset;
-    union {
-        unsigned int overflow_offset;
-        char *overflow_arg_area;
-    };
-    char *reg_save_area;
-} __builtin_va_list[1];
+// /* GCC compatible definition of va_list. */
+// /*predefined by TCC (tcc_predefs.h):*/
+// typedef struct {
+//     unsigned int gp_offset;
+//     unsigned int fp_offset;
+//     union {
+//         unsigned int overflow_offset;
+//         char *overflow_arg_area;
+//     };
+//     char *reg_save_area;
+// } __builtin_va_list[1];
 
 
 extern void *memcpy(void *dest, const void *src, unsigned long n);
