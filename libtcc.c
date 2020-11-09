@@ -809,6 +809,19 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   return res;
 }
 
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename, const char *str)
+{
+  int prv_igv = ds->ignore_global_integration;
+  ds->ignore_global_integration = 1;
+
+  char *temp_func_name char buf[strlen(str) + 120];
+  sprintf(buf, "__temp")
+
+      tcci_add_string(ds, filename, str);
+
+  ds->ignore_global_integration = prv_igv;
+}
+
 LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsigned nb_files)
 {
   int res;
