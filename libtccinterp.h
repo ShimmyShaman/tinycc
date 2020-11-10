@@ -16,6 +16,9 @@ LIBTCCINTERPAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathna
 
 /* compile & link a c-code file-like declaration */
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, const char *str);
+/* interpret and execute single use statement-level code */
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename, const char *code);
+/* compile a group of C-files then link */
 LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsigned nb_files);
 
 LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds);

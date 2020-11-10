@@ -970,6 +970,13 @@ struct TCCInterpState {
     char **include_paths;
     int nb_include_paths;
 
+    int in_single_use_state;
+    struct {
+        unsigned uid_counter;
+        void *func_ptr;
+        void *runtime_mem;
+    } single_use;
+
     struct {
         unsigned offset, allocated;
         uint8_t *ptr;

@@ -1016,6 +1016,8 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
         else {
           if (!set_resolve)
             goto found;
+
+          // Resolve with other interpretive sessions
           for (int a = 0; a < ds->nb_symbols; ++a) {
             if (!strcmp(ds->symbols[a]->name, name)) {
               // printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
@@ -1026,6 +1028,10 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
               // s1->got->reloc
               // TODO performance improvements
 
+              if (ds->in_single_use_state)
+                continue;
+
+              // Register usage of the global symbol (to allow for redirection for the case of redefinition)
               ElfW_Rel *rel;
               for_each_elem(s1->got->reloc, 0, rel, ElfW_Rel)
               {

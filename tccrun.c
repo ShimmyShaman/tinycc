@@ -547,8 +547,13 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 
   // printf("offset=%i max_align=%i\n", offset, max_align);
   void *ptr = tcc_malloc(offset + max_align);
-  dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, ptr);
-  ds->runtime_mem_size += (uint64_t)offset + max_align;
+  if (ds->in_single_use_state) {
+    ds->single_use.runtime_mem = ptr;
+  }
+  else {
+    dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, ptr);
+    ds->runtime_mem_size += (uint64_t)offset + max_align;
+  }
   // printf("ptr @%p allocated:%i\n", ptr, offset + max_align);
 
   offset = max_align = 0, mem = (addr_t)ptr;
@@ -660,7 +665,16 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     // printf("binding:%u type:%u st_shndx:%u st_value:%p\n", binding, type, sym->st_shndx,
     //        (void *)sym->st_value /*s1->sections[sym->st_shndx]->name,  */);
 
-    tcci_set_global_symbol(ds, (char *)symtab->link->data + sym->st_name, binding, type, sym->st_value);
+    if (ds->in_single_use_state) {
+      if (ds->single_use.func_ptr) {
+        // Only one should be set
+        return 5;
+      }
+      ds->single_use.func_ptr = (void *)sym->st_value;
+    }
+    else {
+      tcci_set_global_symbol(ds, (char *)symtab->link->data + sym->st_name, binding, type, sym->st_value);
+    }
   }
 
   return 0;
@@ -922,6 +936,31 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 /* allow to run code in memory */
 static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 {
+  // {
+  //   int a;
+  //   unsigned int res = MPROT_0;
+  //   FILE *f = fopen("/proc/self/maps", "r");
+  //   struct buffer *b = _new_buffer(1024);
+  //   while ((a = fgetc(f)) >= 0) {
+  //     if (_buf_putchar(b, a) || a == '\n') {
+  //       char *end0 = (void *)0;
+  //       unsigned long addr0 = strtoul(b->mem, &end0, 0x10);
+  //       char *end1 = (void *)0;
+  //       unsigned long addr1 = strtoul(end0 + 1, &end1, 0x10);
+  //       if ((void *)addr0 < addr && addr < (void *)addr1) {
+  //         res |= (end1 + 1)[0] == 'r' ? MPROT_R : 0;
+  //         res |= (end1 + 1)[1] == 'w' ? MPROT_W : 0;
+  //         res |= (end1 + 1)[2] == 'x' ? MPROT_X : 0;
+  //         res |= (end1 + 1)[3] == 'p' ? MPROT_P : (end1 + 1)[3] == 's' ? MPROT_S : 0;
+  //         break;
+  //       }
+  //       _buf_reset(b);
+  //     }
+  //   }
+  //   free(b);
+  //   fclose(f);
+  // }
+
 #ifdef _WIN32
   unsigned long old_protect;
   VirtualProtect(ptr, length, PAGE_EXECUTE_READWRITE, &old_protect);
@@ -943,6 +982,31 @@ static void set_pages_executable(TCCState *s1, void *ptr, unsigned long length)
 #endif
 #endif
 }
+
+//   static void remove_pages_executable(void *ptr, unsigned long length) {
+//     // TODO -- I assume the default to return to is read-write. I have no idea
+
+// #ifdef _WIN32
+//     unsigned long old_protect;
+//     VirtualProtect(ptr, length, PAGE_READWRITE, &old_protect);
+// #else
+//     void __clear_cache(void *beginning, void *end);
+// #ifndef HAVE_SELINUX
+//     addr_t start, end;
+// #ifndef PAGESIZE
+// #define PAGESIZE 4096
+// #endif
+//     start = (addr_t)ptr & ~(PAGESIZE - 1);
+//     end = (addr_t)ptr + length;
+//     end = (end + PAGESIZE - 1) & ~(PAGESIZE - 1);
+//     if (mprotect((void *)start, end - start, PROT_READ | PROT_WRITE))
+//       tcc_error("mprotect failed: did you mean to configure --with-selinux?");
+// #endif
+// #if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64
+//     __clear_cache(ptr, (char *)ptr + length);
+// #endif
+// #endif
+//   }
 
 #ifdef _WIN64
 // static void *win64_add_function_table(TCCState *s1)

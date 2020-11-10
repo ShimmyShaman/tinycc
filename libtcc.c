@@ -809,17 +809,35 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   return res;
 }
 
-LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename, const char *str)
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename, const char *code)
 {
-  int prv_igv = ds->ignore_global_integration;
-  ds->ignore_global_integration = 1;
+  int prv_igv = ds->in_single_use_state; // TODO -- shouldn't be anything but false but we'll see
+  ds->in_single_use_state = 1;
 
-  char *temp_func_name char buf[strlen(str) + 120];
-  sprintf(buf, "__temp")
+  char single_use_func_name[60];
+  sprintf(single_use_func_name, "_tcci_single_use_func_%u", ds->single_use.uid_counter++);
+  char buf[strlen(code) + 120];
+  sprintf(buf, "void %s(void) {%s}", single_use_func_name, code);
 
-      tcci_add_string(ds, filename, str);
+  int res = tcci_add_string(ds, filename, buf);
+  if (!res) {
+    // Invoke temporary function
+    void (*single_use_func)(void) = ds->single_use.func_ptr;
+    single_use_func();
+  }
+  else {
+    printf("ERR[824]: Invalid single-use code\n");
+  }
 
-  ds->ignore_global_integration = prv_igv;
+  // Cleanup ...
+  if (ds->single_use.runtime_mem) {
+    free(ds->single_use.runtime_mem);
+    ds->single_use.runtime_mem = NULL;
+  }
+  ds->single_use.func_ptr = NULL;
+
+  ds->in_single_use_state = prv_igv;
+  return res;
 }
 
 LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsigned nb_files)

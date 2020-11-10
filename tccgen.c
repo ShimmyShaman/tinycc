@@ -5477,6 +5477,7 @@ ST_FUNC void unary(void)
     /* XXX: GCC 2.95.3 does not generate a table although it should be
        better here */
  tok_next:
+//  printf("tok:%i\n", tok);
     switch(tok) {
     case TOK_EXTENSION:
         next();
@@ -5989,7 +5990,9 @@ special_math_val:
                 || (name[0] >= 'A' && name[0] <= 'Z')
 #endif
             )
-                tcc_warning("implicit declaration of function '%s'", name);
+            
+                // tcc_warning("implicit declaration of function '%s'", name);
+            tcc_error_noabort("implicit declaration of function '%s'", name);
             s = external_global_sym(t, &func_old_type);
         }
 
