@@ -809,27 +809,80 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   return res;
 }
 
-LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename, const char *code)
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename,
+                                                 const char *comma_seperated_includes, const char *code)
 {
   int prv_igv = ds->in_single_use_state; // TODO -- shouldn't be anything but false but we'll see
   ds->in_single_use_state = 1;
 
-  char single_use_func_name[60];
-  sprintf(single_use_func_name, "_tcci_single_use_func_%u", ds->single_use.uid_counter++);
-  char buf[strlen(code) + 120];
-  sprintf(buf, "void %s(void) {%s}", single_use_func_name, code);
+  // CStr
+  CString str;
+  cstr_new(&str);
+  cstr_realloc(&str, 128 + 2 * strlen(comma_seperated_includes) + strlen(code));
 
-  int res = tcci_add_string(ds, filename, buf);
+  // Pre-Includes
+  if (!comma_seperated_includes)
+    goto includes_complete;
+  int i = 0, s, e = 0;
+  while (1) {
+    s = i;
+    while (1) {
+      printf("comma_seperated_includes[%i]='%c'\n", i, comma_seperated_includes[i]);
+      if (comma_seperated_includes[i] == '\0') {
+        e = 1;
+      }
+      else if (comma_seperated_includes[i] == ',') {
+        // Nothing
+      }
+      else {
+        ++i;
+        continue;
+      }
+      puts("a");
+      if (i - s > 0) {
+        puts("b");
+        cstr_cat(&str, "#include ", 0);
+        puts("c");
+        memcpy(&str, comma_seperated_includes + s, i - s);
+        puts("d");
+        str.size += i - s;
+        cstr_ccat(&str, '\n');
+        puts("e");
+      }
+      puts("f");
+
+      if (e)
+        goto includes_complete;
+      puts("c");
+
+      ++i;
+      break;
+    }
+  }
+
+  char single_use_func_name[60];
+
+includes_complete:
+
+  // Temporary Function Name
+  sprintf(single_use_func_name, "_tcci_single_use_func_%u", ds->single_use.uid_counter++);
+
+  // Add Function
+  cstr_printf(&str, "\nvoid %s(void) {\n%s\n}", single_use_func_name, code);
+
+  int res = tcci_add_string(ds, filename, str.data);
   if (!res) {
     // Invoke temporary function
     void (*single_use_func)(void) = ds->single_use.func_ptr;
     single_use_func();
   }
   else {
-    printf("ERR[824]: Invalid single-use code\n");
+    printf("ERR[824]: Invalid single-use code:\n%s\n", str.data);
   }
 
   // Cleanup ...
+  cstr_free(&str);
+
   if (ds->single_use.runtime_mem) {
     free(ds->single_use.runtime_mem);
     ds->single_use.runtime_mem = NULL;
