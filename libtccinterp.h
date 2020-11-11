@@ -16,6 +16,11 @@ LIBTCCINTERPAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathna
 
 /* compile & link a c-code file-like declaration */
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, const char *str);
+
+// /* set/change pre-process define identifier : Will only affect code that is defined & will
+//      not override included header defines for files */
+// LIBTCCINTERPAPI int tcci_set_pp_define(TCCInterpState *ds, const char *identifier, const char *value);
+
 /* interpret and execute single use statement-level code */
 LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename,
                                                  const char *comma_seperated_includes, const char *code);

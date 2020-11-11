@@ -1893,16 +1893,16 @@ redo:
         goto include_done;
       }
 
-    //   if (!strcmp(buf, "stdarg.h")) {
-    //     printf("substituting '%s' for '%s' \n", "/home/jason/midge/dep/tinycc/include/stdarg.h", buf1);
-    //     strcpy(buf1, "/home/jason/midge/dep/tinycc/include/stdarg.h");
-    //     //   printf("%i = open()\n", tcc_open(s1, "/home/jason/midge/dep/tinycc/include/stdarg.h"));
-    //     //   goto include_done;
-    //   }
+      //   if (!strcmp(buf, "stdarg.h")) {
+      //     printf("substituting '%s' for '%s' \n", "/home/jason/midge/dep/tinycc/include/stdarg.h", buf1);
+      //     strcpy(buf1, "/home/jason/midge/dep/tinycc/include/stdarg.h");
+      //     //   printf("%i = open()\n", tcc_open(s1, "/home/jason/midge/dep/tinycc/include/stdarg.h"));
+      //     //   goto include_done;
+      //   }
 
       if (tcc_open(s1, buf1) < 0)
         continue;
-    //   printf("tcc_open(%s)\n", buf1);
+      //   printf("tcc_open(%s)\n", buf1);
 
       file->include_next_index = i;
 #ifdef INC_DEBUG
@@ -3759,7 +3759,7 @@ static void tcc_predefs(CString *cstr)
 {
   cstr_cat(cstr,
 
-        //    "#include <tcc_predefs.h>\n"
+  //    "#include <tcc_predefs.h>\n"
 
 #if defined TCC_TARGET_X86_64
 #ifndef TCC_TARGET_PE

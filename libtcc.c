@@ -797,17 +797,37 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
   tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
 
-  res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
-  if (res)
-    return res;
+  // PP Defines
+  // if (ds->pp_defines.size) {
+  // printf("pp-predefine:\n%s||\n", (char *)ds->pp_defines.data);
 
-  puts("...Relocating...");
-  res = tcci_relocate_into_memory(ds);
+  //   res = tcc_compile(ds->s1, ds->s1->filetype, ds->pp_defines.data, -1);
+
+  //   printf("pppres:%i\n", res);
+  // }
+
+  // if (!res) {
+  res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
+
+  if (!res) {
+    // puts("...Relocating...");
+    res = tcci_relocate_into_memory(ds);
+  }
+  // }
 
   tcc_delete(ds->s1);
 
   return res;
 }
+
+// LIBTCCINTERPAPI int tcci_set_pp_define(TCCInterpState *ds, const char *identifier, const char *value)
+// {
+//   cstr_printf(&ds->pp_defines, "\n#ifdef %s\n#undef %s\n#endif\n#define %s %s\n", identifier, identifier,
+//   identifier,
+//               value);
+
+//   return 0;
+// }
 
 LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename,
                                                  const char *comma_seperated_includes, const char *code)
@@ -838,22 +858,16 @@ LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char 
         ++i;
         continue;
       }
-      puts("a");
+
       if (i - s > 0) {
-        puts("b");
-        cstr_cat(&str, "#include ", 0);
-        puts("c");
-        memcpy(&str, comma_seperated_includes + s, i - s);
-        puts("d");
+        cstr_cat(&str, "#include ", 9);
+        memcpy((char *)str.data + str.size, comma_seperated_includes + s, sizeof(char) * (i - s));
         str.size += i - s;
         cstr_ccat(&str, '\n');
-        puts("e");
       }
-      puts("f");
 
       if (e)
         goto includes_complete;
-      puts("c");
 
       ++i;
       break;
@@ -868,8 +882,12 @@ includes_complete:
   sprintf(single_use_func_name, "_tcci_single_use_func_%u", ds->single_use.uid_counter++);
 
   // Add Function
+  // printf("cstr::size=%i allocated=%i data='%s'\n", str.size, str.size_allocated, (char *)str.data);
   cstr_printf(&str, "\nvoid %s(void) {\n%s\n}", single_use_func_name, code);
+  // printf("cstr::size=%i allocated=%i data='%s'\n", str.size, str.size_allocated, (char *)str.data);
 
+  cstr_ccat(&str, '\0');
+  // printf("temp_function:\n%s||\n", (char *)str.data);
   int res = tcci_add_string(ds, filename, str.data);
   if (!res) {
     // Invoke temporary function
@@ -877,7 +895,7 @@ includes_complete:
     single_use_func();
   }
   else {
-    printf("ERR[824]: Invalid single-use code:\n%s\n", str.data);
+    printf("\nERR[824]: Invalid single-use code:\n\n%s\n", (char *)str.data);
   }
 
   // Cleanup ...
