@@ -955,12 +955,13 @@ LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_nam
   return NULL;
 }
 
-LIBTCCINTERPAPI void *tcci_add_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
+LIBTCCINTERPAPI void *tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
 {
   TCCISymbol *sym = NULL;
   for (int i = 0; i < ds->nb_symbols; ++i) {
     if (!strcmp(symbol_name, ds->symbols[i]->name)) {
       puts("ERR: Symbol already exists! What do?");
+      dldl TODO
     }
   }
 
