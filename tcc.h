@@ -976,7 +976,7 @@ typedef struct TCCISymbol {
   char *name;
   u_char binding;
   u_char type;
-  Elf64_Addr addr;
+  void *addr;
 
   unsigned nb_got_users;
   void **got_users;

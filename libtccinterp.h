@@ -30,6 +30,6 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsig
 LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds);
 
 LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_name);
-LIBTCCINTERPAPI void *tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr);
+LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr);
 
 #endif // LIBTCCINTERP_H

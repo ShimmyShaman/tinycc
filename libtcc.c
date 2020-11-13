@@ -955,28 +955,29 @@ LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_nam
   return NULL;
 }
 
-LIBTCCINTERPAPI void *tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
+LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
 {
-  TCCISymbol *sym = NULL;
-  for (int i = 0; i < ds->nb_symbols; ++i) {
-    if (!strcmp(symbol_name, ds->symbols[i]->name)) {
-      puts("ERR: Symbol already exists! What do?");
-      dldl TODO
-    }
-  }
+  // TODO -- this method just redirects...
+  tcci_set_global_symbol(ds, symbol_name, STB_GLOBAL, STT_FUNC, addr);
+  // TCCISymbol *sym = NULL;
+  // for (int i = 0; i < ds->nb_symbols; ++i) {
+  //   if (!strcmp(symbol_name, ds->symbols[i]->name)) {
+  //     sym = ds->symbols[i]->name;
+  //   }
+  // }
 
-  if (!sym) {
-    sym = tcc_mallocz(sizeof(TCCISymbol));
-    sym->name = tcc_strdup(symbol_name);
+  // if (!sym) {
+  //   sym = tcc_mallocz(sizeof(TCCISymbol));
+  //   sym->name = tcc_strdup(symbol_name);
 
-    printf(">>>>> added new symbol for '%s' @ %p\n", symbol_name, (void *)addr);
-    dynarray_add(&ds->symbols, &ds->nb_symbols, sym);
-  }
+  //   printf(">>>>> added new symbol for '%s' @ %p\n", symbol_name, (void *)addr);
+  //   dynarray_add(&ds->symbols, &ds->nb_symbols, sym);
+  // }
 
-  // Set Properties
-  sym->binding = STB_GLOBAL;
-  sym->type = STT_FUNC;
-  sym->addr = (addr_t)addr;
+  // // Set Properties
+  // sym->binding = STB_GLOBAL;
+  // sym->type = STT_FUNC;
+  // sym->addr = (addr_t)addr;
 }
 
 /* define a preprocessor symbol. value can be NULL, sym can be "sym=val" */

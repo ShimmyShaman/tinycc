@@ -1021,7 +1021,7 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
           for (int a = 0; a < ds->nb_symbols; ++a) {
             if (!strcmp(ds->symbols[a]->name, name)) {
               // printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
-              sym->st_value = ds->symbols[a]->addr;
+              sym->st_value = (Elf64_Addr)ds->symbols[a]->addr;
               // printf("interp_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
 
               // Find the GOT global addr

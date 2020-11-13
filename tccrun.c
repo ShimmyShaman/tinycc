@@ -455,14 +455,14 @@ typedef struct TCCIFuncRel {
 //   return 0;
 // }
 
-void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding, u_char type, Elf64_Addr addr)
+void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding, u_char type, void *addr)
 {
   TCCISymbol *sym = NULL;
 
   for (int a = 0; a < ds->nb_symbols; ++a) {
     if (!strcmp(name, ds->symbols[a]->name)) {
       sym = ds->symbols[a];
-      printf(">>>>> using old symbol for '%s' @ %p\n", name, (void *)addr);
+      printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, (void *)addr);
       break;
     }
   }
@@ -480,11 +480,11 @@ void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding
   sym->addr = addr;
 
   // printf("has %u users>\n", sym->nb_got_users);
-  // for (int b = 0; b < sym->nb_got_users; ++b) {
-  //   printf("--%p  before:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
-  //   *(void **)sym->got_users[b] = (void *)addr;
-  //   printf("--%p  after:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
-  // }
+  for (int b = 0; b < sym->nb_got_users; ++b) {
+    // printf("--%p  before:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
+    *(void **)sym->got_users[b] = (void *)addr;
+    // printf("--%p  after:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
+  }
 }
 
 LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
@@ -673,7 +673,7 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
       ds->single_use.func_ptr = (void *)sym->st_value;
     }
     else {
-      tcci_set_global_symbol(ds, (char *)symtab->link->data + sym->st_name, binding, type, sym->st_value);
+      tcci_set_global_symbol(ds, (char *)symtab->link->data + sym->st_name, binding, type, (void *)sym->st_value);
     }
   }
 
