@@ -30,6 +30,11 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsig
 LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds);
 
 LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_name);
+
+/* Sets a symbols address (append or update)
+   NOTE: NOT YET PROPERLY IMPLEMENTED. It will also redirect internal interpreter calls if those calls
+     were from seperate compilation units (ie. different calls to add_files,execute_single_use_code,add_string).
+     Yes. Its quite icky. TODO */
 LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr);
 
 #endif // LIBTCCINTERP_H

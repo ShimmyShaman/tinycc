@@ -479,11 +479,13 @@ void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding
   sym->type = type;
   sym->addr = addr;
 
-  // printf("has %u users>\n", sym->nb_got_users);
-  for (int b = 0; b < sym->nb_got_users; ++b) {
-    // printf("--%p  before:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
-    *(void **)sym->got_users[b] = (void *)addr;
-    // printf("--%p  after:%p\n", sym->got_users[b], *(void **)sym->got_users[b]);
+  if (sym->nb_got_users) {
+    printf("has %u users>\n", sym->nb_got_users);
+    for (int b = 0; b < sym->nb_got_users; ++b) {
+      printf("--%p %p  before:%p\n", sym->got_users[b], sym->got_users[b], *(void **)sym->got_users[b]);
+      *(void **)sym->got_users[b] = (void *)addr;
+      printf("--%p %p  after:%p\n", sym->got_users[b], sym->got_users[b], *(void **)sym->got_users[b]);
+    }
   }
 }
 

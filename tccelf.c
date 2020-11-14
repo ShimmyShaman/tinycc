@@ -1049,6 +1049,8 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
                   // delivering a warning NO further checking will be done or ensured - It will be assumed the user
                   // knows of all function calls and has fixed them prior
 
+                  // printf("added user to symbol '%s'\n", ds->symbols[a]->name);
+
                   // TODO -- make this collection a hash-set
                   dynarray_add(&ds->symbols[a]->got_users, &ds->symbols[a]->nb_got_users, tgt);
                   goto found;
