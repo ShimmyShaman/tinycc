@@ -761,7 +761,28 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 /* free a TCC interpretation context */
 LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
 {
-  printf("tcci final mem size:%lu\n", ds->runtime_mem_size);
+#if 1
+  {
+    // Verbose
+    printf("deleting tccinterp state [#sym: %i mem: ", ds->nb_symbols);
+
+    double rms = (double)ds->runtime_mem_size;
+    const char *scale;
+    if (ds->runtime_mem_size < 1e4) {
+      scale = "bytes";
+    }
+    else if (ds->runtime_mem_size < 1e7) {
+      rms = rms / 1e3;
+      scale = "kb";
+    }
+    else {
+      rms = rms / 1e6;
+      scale = "mb";
+    }
+    printf("%.0f%s]\n", rms, scale);
+  }
+#endif
+
   // tcc_delete(ds->s1);
   for (int a = 0; a < ds->nb_runtime_mem_blocks; ++a) {
     free(ds->runtime_mem_blocks[a]);
