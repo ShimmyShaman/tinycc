@@ -764,7 +764,7 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
 #if 1
   {
     // Verbose
-    printf("deleting tccinterp state [#sym: %i mem: ", ds->nb_symbols);
+    printf("deleting tccinterp state [%i symbols, ", ds->nb_symbols);
 
     double rms = (double)ds->runtime_mem_size;
     const char *scale;
@@ -779,7 +779,7 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
       rms = rms / 1e6;
       scale = "mb";
     }
-    printf("%.0f%s]\n", rms, scale);
+    printf("%.0f%s memory]\n", rms, scale);
   }
 #endif
 
@@ -969,6 +969,7 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsig
 LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_name)
 {
   for (int i = 0; i < ds->nb_symbols; ++i) {
+    // printf("symbol_name='%s', ds->symbols[i]->name='%s'\n",symbol_name, ds->symbols[i]->name);
     if (!strcmp(symbol_name, ds->symbols[i]->name)) {
       return (void *)ds->symbols[i]->addr;
     }
