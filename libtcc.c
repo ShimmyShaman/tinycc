@@ -796,6 +796,9 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
   }
   free(ds->symbols);
 
+  for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
+    free(ds->cmdline_defs[a]);
+  }
   for (int a = 0; a < ds->nb_include_paths; ++a) {
     free(ds->include_paths[a]);
   }
@@ -814,6 +817,9 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
       puts("ERR[793]"); // TODO
       return res;
     }
+  }
+  for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
+    tcc_define_symbol(ds->s1, ds->cmdline_defs[a], ds->cmdline_defs[a + 1]);
   }
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
   tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
@@ -944,6 +950,9 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsig
       return res;
     }
   }
+  for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
+    tcc_define_symbol(ds->s1, ds->cmdline_defs[a], ds->cmdline_defs[a + 1]);
+  }
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
   tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
 
@@ -975,6 +984,35 @@ LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_nam
     }
   }
   return NULL;
+}
+
+LIBTCCINTERPAPI void tcci_define_symbol(TCCInterpState *ds, const char *sym, const char *value)
+{
+  // TODO -- because im subtracting from this array, its silly/redundant to send to a method that
+  // will always be increasing its allocation based on its assumed highest number (which isnt true)
+
+  char *str = tcc_strdup(sym);
+  dynarray_add(&ds->cmdline_defs, &ds->nb_cmdline_def_pairs, str);
+
+  if (value)
+    str = tcc_strdup(value);
+  else
+    str = NULL;
+  dynarray_add(&ds->cmdline_defs, &ds->nb_cmdline_def_pairs, str);
+}
+
+/* undefine a preprocessor symbol */
+LIBTCCINTERPAPI void tcci_undefine_symbol(TCCInterpState *ds, const char *sym)
+{
+  for (int i = ds->nb_cmdline_def_pairs - 2; i >= 0; i -= 2) {
+    if (!strcmp(sym, ds->cmdline_defs[i])) {
+      // Remove it
+      for (int j = i + 2; j < ds->nb_cmdline_def_pairs; ++j) {
+        ds->cmdline_defs[j - 2] = ds->cmdline_defs[j];
+      }
+      ds->nb_cmdline_def_pairs -= 2;
+    }
+  }
 }
 
 LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)

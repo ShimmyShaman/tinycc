@@ -991,7 +991,8 @@ struct TCCInterpState {
   struct TCCISymbol **symbols; /* pointer to execution text blocks */
   int nb_symbols;              /* number thereof */
 
-  CString pp_defines;
+  int nb_cmdline_def_pairs;
+  char **cmdline_defs;
 
   char **include_paths;
   int nb_include_paths;

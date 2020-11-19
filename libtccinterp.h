@@ -37,4 +37,11 @@ LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_nam
      Yes. Its quite icky. TODO */
 LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr);
 
+/* TODO -- figure out naming and if I want to rid of tcci or just redirect with this
+    -- I hope it doesn't have to wait till I figure out how to integrate tcc accumulative interpretation into tccs code
+   base
+ */
+// LIBTCCAPI void tcc_define_symbol(TCCState *s1, const char *sym, const char *value)
+LIBTCCINTERPAPI void tcci_define_symbol(TCCInterpState *ds, const char *sym, const char *value);
+LIBTCCINTERPAPI void tcci_undefine_symbol(TCCInterpState *ds, const char *sym);
 #endif // LIBTCCINTERP_H
