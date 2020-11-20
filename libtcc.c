@@ -1017,6 +1017,7 @@ LIBTCCINTERPAPI void tcci_undefine_symbol(TCCInterpState *ds, const char *sym)
 
 LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
 {
+  // tcc_load_object_file
   // TODO -- this method just redirects...
   tcci_set_global_symbol(ds, symbol_name, STB_GLOBAL, STT_FUNC, addr);
   // TCCISymbol *sym = NULL;

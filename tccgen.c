@@ -4596,8 +4596,11 @@ do_decl:
 
   if (tok == '{') {
     next();
-    if (s->c != -1)
+    if (s->c != -1){
+          printf("tok:%i %s\n", tok, table_ident[v - TOK_IDENT]->str);
       tcc_error("struct/union/enum already defined");
+      puts("after");
+    }
     s->c = -2;
     /* cannot be empty */
     /* non empty enums are not allowed */
