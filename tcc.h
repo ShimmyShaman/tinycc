@@ -993,6 +993,8 @@ struct TCCInterpState {
 
   int nb_cmdline_def_pairs;
   char **cmdline_defs;
+  int nb_libraries;
+  char **libraries;
 
   char **include_paths;
   int nb_include_paths;

@@ -1056,7 +1056,7 @@ ST_INLN Sym *struct_find(int v)
 /* find an identifier */
 ST_INLN Sym *sym_find(int v)
 {
-//   printf("v:%i TOK_IDENT:%i tok_ident:%i %p\n", v, TOK_IDENT, tok_ident);
+  //   printf("v:%i TOK_IDENT:%i tok_ident:%i %p\n", v, TOK_IDENT, tok_ident);
   v -= TOK_IDENT;
   if ((unsigned)v >= (unsigned)(tok_ident - TOK_IDENT))
     return NULL;
@@ -4596,8 +4596,8 @@ do_decl:
 
   if (tok == '{') {
     next();
-    if (s->c != -1){
-          printf("tok:%i %s\n", tok, table_ident[v - TOK_IDENT]->str);
+    if (s->c != -1) {
+      printf("tok:%i %s\n", tok, table_ident[v - TOK_IDENT]->str);
       tcc_error("struct/union/enum already defined");
       puts("after");
     }
@@ -4666,10 +4666,10 @@ do_decl:
     else {
       c = 0;
       flexible = 0;
-    //   puts("[[struct]]");
+      //   puts("[[struct]]");
       while (tok != '}') {
         if (!parse_btype(&btype, &ad1)) {
-        //   printf("btype.t:%i\n", btype.t);
+          //   printf("btype.t:%i\n", btype.t);
           skip(';');
           continue;
         }
@@ -4680,13 +4680,13 @@ do_decl:
           bit_size = -1;
           v = 0;
           type1 = btype;
-        //   {
-        //   DEBUG
-        //   if(tok < 256)
-        //   printf("tok:%c\n", tok);
-        //   else
-        //   printf("tok:%i %s\n", tok, table_ident[tok - TOK_IDENT]->str);
-        //   }
+          //   {
+          //   DEBUG
+          //   if(tok < 256)
+          //   printf("tok:%c\n", tok);
+          //   else
+          //   printf("tok:%i %s\n", tok, table_ident[tok - TOK_IDENT]->str);
+          //   }
           if (tok != ':') {
             if (tok != ';')
               type_decl(&type1, &ad1, &v, TYPE_DIRECT);
@@ -4805,7 +4805,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
   bt = st = -1;
   type->ref = NULL;
 
-//   puts("parse_btype");
+  //   puts("parse_btype");
   while (1) {
     // printf("tok:%i\n", tok);
     switch (tok) {
@@ -5006,7 +5006,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
       if (typespec_found)
         goto the_end;
       s = sym_find(tok);
-    //   printf("s:%p\n", s);
+      //   printf("s:%p\n", s);
       if (!s || !(s->type.t & VT_TYPEDEF))
         goto the_end;
 
@@ -7396,8 +7396,10 @@ static void parse_init_elem(int expr_type)
 #if 1
 static void init_assert(init_params *p, int offset)
 {
-  if (p->sec ? !NODATA_WANTED && offset > p->sec->data_offset : !nocode_wanted && offset > p->local_offset)
+  if (p->sec ? !NODATA_WANTED && offset > p->sec->data_offset : !nocode_wanted && offset > p->local_offset) {
+    printf("p->sec:%p offset:%i local_offset:%i nocode_wanted:%i\n", p->sec, offset, p->local_offset, nocode_wanted);
     tcc_internal_error("initializer overflow");
+  }
 }
 #else
 #define init_assert(sec, offset)

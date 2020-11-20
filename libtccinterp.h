@@ -14,6 +14,8 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds);
 
 LIBTCCINTERPAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathname);
 
+LIBTCCINTERPAPI int tcci_add_library(TCCInterpState *ds, const char *libname);
+
 /* compile & link a c-code file-like declaration */
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, const char *str);
 

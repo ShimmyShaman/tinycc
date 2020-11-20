@@ -750,6 +750,13 @@ LIBTCCAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathname)
   return 0;
 }
 
+LIBTCCAPI int tcci_add_library(TCCInterpState *ds, const char *libname)
+{
+  char *lib_dup = tcc_strdup(libname);
+  dynarray_add(&ds->libraries, &ds->nb_libraries, lib_dup);
+  return 0;
+}
+
 /* create a new TCC interpretation context */
 LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
@@ -796,13 +803,26 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
   }
   free(ds->symbols);
 
-  for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
-    free(ds->cmdline_defs[a]);
+  if (ds->nb_cmdline_def_pairs) {
+    for (int a = 0; a < ds->nb_cmdline_def_pairs; ++a) {
+      free(ds->cmdline_defs[a]);
+    }
+    free(ds->cmdline_defs);
   }
-  for (int a = 0; a < ds->nb_include_paths; ++a) {
-    free(ds->include_paths[a]);
+
+  if (ds->nb_include_paths) {
+    for (int a = 0; a < ds->nb_include_paths; ++a) {
+      free(ds->include_paths[a]);
+    }
+    free(ds->include_paths);
   }
-  free(ds->include_paths);
+
+  if (ds->nb_libraries) {
+    for (int a = 0; a < ds->nb_libraries; ++a) {
+      free(ds->libraries[a]);
+    }
+    free(ds->libraries);
+  }
 
   free(ds);
 }
@@ -823,6 +843,16 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   }
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
   tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
+
+  for (int a = 0; a < ds->nb_libraries; ++a) {
+    tcc_add_library(ds->s1, ds->libraries[a]);
+  }
+  // tcc_add_library(ds->s1, "xcb");
+  // const char *libname = "xcb";
+  // struct filespec *f = tcc_malloc(sizeof *f + strlen(libname));
+  // f->type = 0;
+  // strcpy(f->name, libname);
+  // dynarray_add(&ds->s1->files, &ds->s1->nb_files, f);
 
   // PP Defines
   // if (ds->pp_defines.size) {
@@ -952,6 +982,9 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsig
   }
   for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
     tcc_define_symbol(ds->s1, ds->cmdline_defs[a], ds->cmdline_defs[a + 1]);
+  }
+  for (int a = 0; a < ds->nb_libraries; ++a) {
+    tcc_add_library(ds->s1, ds->libraries[a]);
   }
   tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
   tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
