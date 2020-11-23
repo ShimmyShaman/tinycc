@@ -704,7 +704,7 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd)
 
     if (fd == -1) {
       int len = strlen(str);
-      tcc_open_bf(s1, "<string>", len);
+      tcc_open_bf(s1, s1->string_filename ? s1->string_filename : "<string>", len);
       memcpy(file->buffer, str, len);
     }
     else {
@@ -864,6 +864,7 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   // }
 
   // if (!res) {
+  ds->s1->string_filename = filename;
   res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
 
   if (!res) {

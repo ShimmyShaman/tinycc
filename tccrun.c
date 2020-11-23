@@ -470,7 +470,7 @@ void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding
     sym = tcc_mallocz(sizeof(TCCISymbol));
     sym->name = tcc_strdup(name);
 
-    printf(">>>>> added new symbol for '%s' @ %p\n", name, (void *)addr);
+    // printf(">>>>> added new symbol for '%s' @ %p\n", name, (void *)addr);
     dynarray_add(&ds->symbols, &ds->nb_symbols, sym);
   }
 

@@ -749,6 +749,8 @@ struct TCCState {
   char *soname;       /* as specified on the command line (-soname) */
   char *rpath;        /* as specified on the command line (-Wl,-rpath=) */
 
+  const char *string_filename; /* what to call the string compiled with compile_string() */
+
   /* output type, see TCC_OUTPUT_XXX */
   int output_type;
   /* output format, see TCC_OUTPUT_FORMAT_xxx */
