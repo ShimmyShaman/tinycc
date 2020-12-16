@@ -827,10 +827,22 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
   free(ds);
 }
 
+LIBTCCINTERPAPI void tcci_set_Werror(TCCInterpState *ds, unsigned char value) { ds->warn_error = value; }
+
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, const char *str)
 {
   int res;
   ds->s1 = tcc_new();
+  ds->s1->warn_error = ds->warn_error;
+
+  // Initialize the output
+  res = tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
+  if (res) {
+    puts("ERR[793]"); // TODO
+    return res;
+  }
+
+  // Interpreter-scope include paths
   for (int a = 0; a < ds->nb_include_paths; ++a) {
     res = tcc_add_include_path(ds->s1, ds->include_paths[a]);
     if (res) {
@@ -838,30 +850,18 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
       return res;
     }
   }
+
+  // Interpreter-scope defines
   for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
     tcc_define_symbol(ds->s1, ds->cmdline_defs[a], ds->cmdline_defs[a + 1]);
   }
-  tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
-  tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
 
+  // Interpreter-scope libraries
   for (int a = 0; a < ds->nb_libraries; ++a) {
     tcc_add_library(ds->s1, ds->libraries[a]);
   }
-  // tcc_add_library(ds->s1, "xcb");
-  // const char *libname = "xcb";
-  // struct filespec *f = tcc_malloc(sizeof *f + strlen(libname));
-  // f->type = 0;
-  // strcpy(f->name, libname);
-  // dynarray_add(&ds->s1->files, &ds->s1->nb_files, f);
 
-  // PP Defines
-  // if (ds->pp_defines.size) {
-  // printf("pp-predefine:\n%s||\n", (char *)ds->pp_defines.data);
-
-  //   res = tcc_compile(ds->s1, ds->s1->filetype, ds->pp_defines.data, -1);
-
-  //   printf("pppres:%i\n", res);
-  // }
+  tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
 
   // if (!res) {
   ds->s1->string_filename = filename;

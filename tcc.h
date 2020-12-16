@@ -234,41 +234,42 @@ extern long double strtold(const char *__nptr, char **__endptr);
 #if defined TCC_TARGET_PE || defined _WIN32
 #define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include" PATHSEP "{B}/include/winapi"
 #else
-#define CONFIG_TCC_SYSINCLUDEPATHS                                                                                                \
-  "{B}/include"                                                                                                                   \
-  ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/include") ":" ALSO_TRIPLET(         \
-      CONFIG_SYSROOT                                                                                                              \
-      "/usr/lib/gcc/x86_64-linux-gnu/7/include") ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/lib/gcc/x86_64-linux-gnu/7/"               \
-                                                                                 "include-fixed") ":" ALSO_TRIPLET(CONFIG_SYSROOT \
-                                                                                                                   "/"            \
-                                                                                                                   "u"            \
-                                                                                                                   "s"            \
-                                                                                                                   "r"            \
-                                                                                                                   "/"            \
-                                                                                                                   "i"            \
-                                                                                                                   "n"            \
-                                                                                                                   "c"            \
-                                                                                                                   "l"            \
-                                                                                                                   "u"            \
-                                                                                                                   "d"            \
-                                                                                                                   "e"            \
-                                                                                                                   "/"            \
-                                                                                                                   "x"            \
-                                                                                                                   "8"            \
-                                                                                                                   "6"            \
-                                                                                                                   "_"            \
-                                                                                                                   "6"            \
-                                                                                                                   "4"            \
-                                                                                                                   "-"            \
-                                                                                                                   "l"            \
-                                                                                                                   "i"            \
-                                                                                                                   "n"            \
-                                                                                                                   "u"            \
-                                                                                                                   "x"            \
-                                                                                                                   "-"            \
-                                                                                                                   "g"            \
-                                                                                                                   "n"            \
-                                                                                                                   "u")
+#define CONFIG_TCC_SYSINCLUDEPATHS                                                                                        \
+  "{B}/include"                                                                                                           \
+  ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/include") ":" ALSO_TRIPLET( \
+      CONFIG_SYSROOT                                                                                                      \
+      "/usr/lib/gcc/x86_64-linux-gnu/7/include") ":" ALSO_TRIPLET(CONFIG_SYSROOT                                          \
+                                                                  "/usr/lib/gcc/x86_64-linux-gnu/7/"                      \
+                                                                  "include-fixed") ":" ALSO_TRIPLET(CONFIG_SYSROOT        \
+                                                                                                    "/"                   \
+                                                                                                    "u"                   \
+                                                                                                    "s"                   \
+                                                                                                    "r"                   \
+                                                                                                    "/"                   \
+                                                                                                    "i"                   \
+                                                                                                    "n"                   \
+                                                                                                    "c"                   \
+                                                                                                    "l"                   \
+                                                                                                    "u"                   \
+                                                                                                    "d"                   \
+                                                                                                    "e"                   \
+                                                                                                    "/"                   \
+                                                                                                    "x"                   \
+                                                                                                    "8"                   \
+                                                                                                    "6"                   \
+                                                                                                    "_"                   \
+                                                                                                    "6"                   \
+                                                                                                    "4"                   \
+                                                                                                    "-"                   \
+                                                                                                    "l"                   \
+                                                                                                    "i"                   \
+                                                                                                    "n"                   \
+                                                                                                    "u"                   \
+                                                                                                    "x"                   \
+                                                                                                    "-"                   \
+                                                                                                    "g"                   \
+                                                                                                    "n"                   \
+                                                                                                    "u")
 #endif
 #endif
 
@@ -986,6 +987,8 @@ typedef struct TCCISymbol {
 
 struct TCCInterpState {
   TCCState *s1;
+
+  unsigned char warn_error;
 
   void **runtime_mem_blocks; /* pointer to execution text blocks */
   int nb_runtime_mem_blocks; /* number thereof */

@@ -1,5 +1,11 @@
 TODO list:
 
+Midge-Relevant:
+- In regards to cache usage of virtual memory addresses:
+  - "The best a programmer can do is to a) use logical memory pages completely and b) use page sizes as large
+    as meaningful to diversify the physical addresses as much as possible. Larger page sizes have other benefits, too..."
+  - interp does not do this whatsoever.
+  
 Bugs:
 
 - i386 fastcall is mostly wrong

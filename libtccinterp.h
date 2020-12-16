@@ -12,6 +12,8 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void);
 /* free a TCC interpretation context */
 LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds);
 
+LIBTCCINTERPAPI void tcci_set_Werror(TCCInterpState *ds, unsigned char value);
+
 LIBTCCINTERPAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathname);
 
 LIBTCCINTERPAPI int tcci_add_library(TCCInterpState *ds, const char *libname);
