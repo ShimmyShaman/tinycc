@@ -227,8 +227,8 @@ extern long double strtold(const char *__nptr, char **__endptr);
 
 /* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
 // MCDEBUG TODO
-// ":" ALSO_TRIPLET(CONFIG_SYSROOT "/home/jason/proj/tcc/tinycc/include")              \
-    // ":" ALSO_TRIPLET(CONFIG_SYSROOT "/home/jason/proj/tcc/tinycc/tests/misc")           \
+// ":" ALSO_TRIPLET(CONFIG_SYSROOT "tcc/tinycc/include")              \
+    // ":" ALSO_TRIPLET(CONFIG_SYSROOT "tcc/tinycc/tests/misc")           \
 /* system include paths */
 #ifndef CONFIG_TCC_SYSINCLUDEPATHS
 #if defined TCC_TARGET_PE || defined _WIN32

@@ -1894,9 +1894,9 @@ redo:
       }
 
       //   if (!strcmp(buf, "stdarg.h")) {
-      //     printf("substituting '%s' for '%s' \n", "/home/jason/midge/dep/tinycc/include/stdarg.h", buf1);
-      //     strcpy(buf1, "/home/jason/midge/dep/tinycc/include/stdarg.h");
-      //     //   printf("%i = open()\n", tcc_open(s1, "/home/jason/midge/dep/tinycc/include/stdarg.h"));
+      //     printf("substituting '%s' for '%s' \n", "dep/tinycc/include/stdarg.h", buf1);
+      //     strcpy(buf1, "dep/tinycc/include/stdarg.h");
+      //     //   printf("%i = open()\n", tcc_open(s1, "dep/tinycc/include/stdarg.h"));
       //     //   goto include_done;
       //   }
 
