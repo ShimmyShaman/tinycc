@@ -888,7 +888,8 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
 // }
 
 LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename,
-                                                 const char *comma_seperated_includes, const char *code)
+                                                 const char *comma_seperated_includes, const char *code, void *vargs,
+                                                 void **result)
 {
   int prv_igv = ds->in_single_use_state; // TODO -- shouldn't be anything but false but we'll see
   ds->in_single_use_state = 1;
@@ -905,7 +906,7 @@ LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char 
   while (1) {
     s = i;
     while (1) {
-      printf("comma_seperated_includes[%i]='%c'\n", i, comma_seperated_includes[i]);
+      // printf("comma_seperated_includes[%i]='%c'\n", i, comma_seperated_includes[i]);
       if (comma_seperated_includes[i] == '\0') {
         e = 1;
       }
@@ -941,16 +942,23 @@ includes_complete:
 
   // Add Function
   // printf("cstr::size=%i allocated=%i data='%s'\n", str.size, str.size_allocated, (char *)str.data);
-  cstr_printf(&str, "\nvoid %s(void) {\n%s\n}", single_use_func_name, code);
+  cstr_printf(&str, "\nvoid *%s(void *vargs) {\n%s\n}", single_use_func_name, code);
   // printf("cstr::size=%i allocated=%i data='%s'\n", str.size, str.size_allocated, (char *)str.data);
 
   cstr_ccat(&str, '\0');
   // printf("temp_function:\n%s||\n", (char *)str.data);
   int res = tcci_add_string(ds, filename, str.data);
   if (!res) {
+    // printf("tcci string added: %p\n", (void *)ds->single_use.func_ptr);
     // Invoke temporary function
-    void (*single_use_func)(void) = ds->single_use.func_ptr;
-    single_use_func();
+    void *(*single_use_func)(void *) = ds->single_use.func_ptr;
+    if (result) {
+      *result = single_use_func(vargs);
+    }
+    else {
+      single_use_func(vargs);
+    }
+    // puts("executed!");
   }
   else {
     printf("\nERR[824]: Invalid single-use code:\n\n%s\n", (char *)str.data);
@@ -958,6 +966,7 @@ includes_complete:
 
   // Cleanup ...
   cstr_free(&str);
+  // puts("cleaning!");
 
   if (ds->single_use.runtime_mem) {
     free(ds->single_use.runtime_mem);

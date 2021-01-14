@@ -672,6 +672,7 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
         // Only one should be set
         return 5;
       }
+      // printf("ds->single_use.func_ptr = (void *)sym->st_value(%p);\n", (void *)sym->st_value);
       ds->single_use.func_ptr = (void *)sym->st_value;
     }
     else {
