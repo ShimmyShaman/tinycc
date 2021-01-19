@@ -59,6 +59,8 @@
 #ifdef TCC_TARGET_MACHO
 #include "tccmacho.c"
 #endif
+// #include "help/hash_table.h"
+#include "help/hash_table.c"
 #endif /* ONE_SOURCE */
 
 #include "tcc.h"
@@ -743,42 +745,87 @@ LIBTCCAPI int tcc_compile_string(TCCState *s, const char *str) { return tcc_comp
 
 void tcci_handle_error(void *opaque, const char *msg) { fprintf(opaque, "%s\n", msg); }
 
-LIBTCCAPI int tcci_add_include_path(TCCInterpState *ds, const char *pathname)
+LIBTCCAPI int tcci_add_include_path(TCCInterpState *itp, const char *pathname)
 {
   char *path_dup = tcc_strdup(pathname);
-  dynarray_add(&ds->include_paths, &ds->nb_include_paths, path_dup);
+  dynarray_add(&itp->include_paths, &itp->nb_include_paths, path_dup);
   return 0;
 }
 
-LIBTCCAPI int tcci_add_library(TCCInterpState *ds, const char *libname)
+LIBTCCAPI int tcci_add_library(TCCInterpState *itp, const char *libname)
 {
   char *lib_dup = tcc_strdup(libname);
-  dynarray_add(&ds->libraries, &ds->nb_libraries, lib_dup);
+  dynarray_add(&itp->libraries, &itp->nb_libraries, lib_dup);
   return 0;
 }
 
 /* create a new TCC interpretation context */
 LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
-  TCCInterpState *ds = tcc_mallocz(sizeof(TCCInterpState));
-  // ds->s1 = tcc_new();
-  return ds;
+  TCCInterpState *itp = tcc_mallocz(sizeof(TCCInterpState));
+
+  // TODO -- add a param for expected function declarations &/ redefinitions?
+  init_hash_table(1024, &itp->redir.hash_to_addr);
+  init_hash_table(2048, &itp->redir.addr_to_addr);
+  itp->redir.do_subst = 0;
+  char fyf[32], buf[512];
+  strcpy(fyf, "__tcci_get_fptr_by_fname_hash_");
+  sprintf(buf,
+          "#include <stdio.h>\n"
+          "\n"
+          "void *%s(unsigned long hash) {\n"
+          "  printf(\"!!__tcci_get_fptr_by_fname_hash_!!\\nhash=%%lu\\n\", hash);\n"
+          "  void *fp = ((void *(*)(unsigned long, void *))%p)(hash, (void *)%p);\n"
+          "  printf(\"fp=%%p\\n\", fp);\n"
+          "  return fp;\n"
+          "}",
+          fyf, &hash_table_get_by_hash, &itp->redir.hash_to_addr);
+  puts(buf);
+  tcci_add_string(itp, "_tcci_init.gen", buf);
+
+  itp->redir.get_by_hash_sym = NULL;
+  for (int i = 0; i < itp->nb_symbols; ++i) {
+    if (!strcmp(fyf, itp->symbols[i]->name)) {
+      // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
+      itp->redir.get_by_hash_sym = itp->symbols[i];
+    }
+  }
+  if (!itp->redir.get_by_hash_sym)
+    expect("itp->redir.get_by_hash_sym not NULL");
+  // itp->redir.get_by_hash_fptr = (void *)tcci_get_symbol(itp, fyf);
+
+  // DEBUG
+  strcpy(fyf, "DooDop");
+  sprintf(buf,
+          "#include <stdio.h>\n"
+          "\n"
+          "void *getit() { return (void *)%p; }\n"
+          "\n"
+          "void %s() {\n"
+          "  ((void (*)(void))getit())();\n"
+          "}",
+          &hash_table_find, fyf);
+  tcci_add_string(itp, "_tcci_init.gen", buf);
+  // DEBUG
+  itp->redir.do_subst = 1;
+
+  return itp;
 }
 
 /* free a TCC interpretation context */
-LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
+LIBTCCINTERPAPI void tcci_delete(TCCInterpState *itp)
 {
 #if 1
   {
     // Verbose
-    printf("deleting tccinterp state [%i symbols, ", ds->nb_symbols);
+    printf("deleting tccinterp state [%i symbols, ", itp->nb_symbols);
 
-    double rms = (double)ds->runtime_mem_size;
+    double rms = (double)itp->runtime_mem_size;
     const char *scale;
-    if (ds->runtime_mem_size < 1e4) {
+    if (itp->runtime_mem_size < 1e4) {
       scale = "bytes";
     }
-    else if (ds->runtime_mem_size < 1e7) {
+    else if (itp->runtime_mem_size < 1e7) {
       rms = rms / 1e3;
       scale = "kb";
     }
@@ -790,61 +837,63 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *ds)
   }
 #endif
 
-  // tcc_delete(ds->s1);
-  for (int a = 0; a < ds->nb_runtime_mem_blocks; ++a) {
-    free(ds->runtime_mem_blocks[a]);
+  // tcc_delete(itp->s1);
+  for (int a = 0; a < itp->nb_runtime_mem_blocks; ++a) {
+    free(itp->runtime_mem_blocks[a]);
   }
-  free(ds->runtime_mem_blocks);
+  free(itp->runtime_mem_blocks);
 
-  for (int a = 0; a < ds->nb_symbols; ++a) {
-    TCCISymbol *sym = ds->symbols[a];
+  for (int a = 0; a < itp->nb_symbols; ++a) {
+    TCCISymbol *sym = itp->symbols[a];
     free(sym->name);
     free(sym);
   }
-  free(ds->symbols);
+  free(itp->symbols);
 
-  if (ds->nb_cmdline_def_pairs) {
-    for (int a = 0; a < ds->nb_cmdline_def_pairs; ++a) {
-      free(ds->cmdline_defs[a]);
+  if (itp->nb_cmdline_def_pairs) {
+    for (int a = 0; a < itp->nb_cmdline_def_pairs; ++a) {
+      free(itp->cmdline_defs[a]);
     }
-    free(ds->cmdline_defs);
+    free(itp->cmdline_defs);
   }
 
-  if (ds->nb_include_paths) {
-    for (int a = 0; a < ds->nb_include_paths; ++a) {
-      free(ds->include_paths[a]);
+  if (itp->nb_include_paths) {
+    for (int a = 0; a < itp->nb_include_paths; ++a) {
+      free(itp->include_paths[a]);
     }
-    free(ds->include_paths);
+    free(itp->include_paths);
   }
 
-  if (ds->nb_libraries) {
-    for (int a = 0; a < ds->nb_libraries; ++a) {
-      free(ds->libraries[a]);
+  if (itp->nb_libraries) {
+    for (int a = 0; a < itp->nb_libraries; ++a) {
+      free(itp->libraries[a]);
     }
-    free(ds->libraries);
+    free(itp->libraries);
   }
 
-  free(ds);
+  free(itp);
 }
 
-LIBTCCINTERPAPI void tcci_set_Werror(TCCInterpState *ds, unsigned char value) { ds->warn_error = value; }
+LIBTCCINTERPAPI void tcci_set_Werror(TCCInterpState *itp, unsigned char value) { itp->warn_error = value; }
 
-LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, const char *str)
+LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, const char *str)
 {
   int res;
-  ds->s1 = tcc_new();
-  ds->s1->warn_error = ds->warn_error;
+
+  tcci_state = itp;
+  itp->s1 = tcc_new();
+  itp->s1->warn_error = itp->warn_error;
 
   // Initialize the output
-  res = tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
+  res = tcc_set_output_type(itp->s1, TCC_OUTPUT_MEMORY);
   if (res) {
     puts("ERR[793]"); // TODO
     return res;
   }
 
   // Interpreter-scope include paths
-  for (int a = 0; a < ds->nb_include_paths; ++a) {
-    res = tcc_add_include_path(ds->s1, ds->include_paths[a]);
+  for (int a = 0; a < itp->nb_include_paths; ++a) {
+    res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
     if (res) {
       puts("ERR[793]"); // TODO
       return res;
@@ -852,47 +901,48 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
   }
 
   // Interpreter-scope defines
-  for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
-    tcc_define_symbol(ds->s1, ds->cmdline_defs[a], ds->cmdline_defs[a + 1]);
+  for (int a = 0; a < itp->nb_cmdline_def_pairs; a += 2) {
+    tcc_define_symbol(itp->s1, itp->cmdline_defs[a], itp->cmdline_defs[a + 1]);
   }
 
   // Interpreter-scope libraries
-  for (int a = 0; a < ds->nb_libraries; ++a) {
-    tcc_add_library(ds->s1, ds->libraries[a]);
+  for (int a = 0; a < itp->nb_libraries; ++a) {
+    tcc_add_library(itp->s1, itp->libraries[a]);
   }
 
-  tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
+  tcc_set_error_func(itp->s1, stderr, tcci_handle_error);
 
   // if (!res) {
-  ds->s1->string_filename = filename;
-  res = tcc_compile(ds->s1, ds->s1->filetype, str, -1);
+  itp->s1->string_filename = filename;
+  res = tcc_compile(itp->s1, itp->s1->filetype, str, -1);
 
   if (!res) {
     // puts("...Relocating...");
-    res = tcci_relocate_into_memory(ds);
+    res = tcci_relocate_into_memory(itp);
   }
   // }
 
-  tcc_delete(ds->s1);
+  tcc_delete(itp->s1);
+  tcci_state = NULL;
 
   return res;
 }
 
-// LIBTCCINTERPAPI int tcci_set_pp_define(TCCInterpState *ds, const char *identifier, const char *value)
+// LIBTCCINTERPAPI int tcci_set_pp_define(TCCInterpState *itp, const char *identifier, const char *value)
 // {
-//   cstr_printf(&ds->pp_defines, "\n#ifdef %s\n#undef %s\n#endif\n#define %s %s\n", identifier, identifier,
+//   cstr_printf(&itp->pp_defines, "\n#ifdef %s\n#undef %s\n#endif\n#define %s %s\n", identifier, identifier,
 //   identifier,
 //               value);
 
 //   return 0;
 // }
 
-LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename,
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *itp, const char *filename,
                                                  const char *comma_seperated_includes, const char *code, void *vargs,
                                                  void **result)
 {
-  int prv_igv = ds->in_single_use_state; // TODO -- shouldn't be anything but false but we'll see
-  ds->in_single_use_state = 1;
+  int prv_igv = itp->in_single_use_state; // TODO -- shouldn't be anything but false but we'll see
+  itp->in_single_use_state = 1;
 
   // CStr
   CString str;
@@ -938,7 +988,7 @@ LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char 
 includes_complete:
 
   // Temporary Function Name
-  sprintf(single_use_func_name, "_tcci_single_use_func_%u", ds->single_use.uid_counter++);
+  sprintf(single_use_func_name, "_tcci_single_use_func_%u", itp->single_use.uid_counter++);
 
   // Add Function
   // printf("cstr::size=%i allocated=%i data='%s'\n", str.size, str.size_allocated, (char *)str.data);
@@ -947,11 +997,11 @@ includes_complete:
 
   cstr_ccat(&str, '\0');
   // printf("temp_function:\n%s||\n", (char *)str.data);
-  int res = tcci_add_string(ds, filename, str.data);
+  int res = tcci_add_string(itp, filename, str.data);
   if (!res) {
-    // printf("tcci string added: %p\n", (void *)ds->single_use.func_ptr);
+    // printf("tcci string added: %p\n", (void *)itp->single_use.func_ptr);
     // Invoke temporary function
-    void *(*single_use_func)(void *) = ds->single_use.func_ptr;
+    void *(*single_use_func)(void *) = itp->single_use.func_ptr;
     if (result) {
       *result = single_use_func(vargs);
     }
@@ -968,105 +1018,105 @@ includes_complete:
   cstr_free(&str);
   // puts("cleaning!");
 
-  if (ds->single_use.runtime_mem) {
-    free(ds->single_use.runtime_mem);
-    ds->single_use.runtime_mem = NULL;
+  if (itp->single_use.runtime_mem) {
+    free(itp->single_use.runtime_mem);
+    itp->single_use.runtime_mem = NULL;
   }
-  ds->single_use.func_ptr = NULL;
+  itp->single_use.func_ptr = NULL;
 
-  ds->in_single_use_state = prv_igv;
+  itp->in_single_use_state = prv_igv;
   return res;
 }
 
-LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsigned nb_files)
+LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsigned nb_files)
 {
   int res;
 
-  ds->s1 = tcc_new();
-  for (int a = 0; a < ds->nb_include_paths; ++a) {
-    res = tcc_add_include_path(ds->s1, ds->include_paths[a]);
+  itp->s1 = tcc_new();
+  for (int a = 0; a < itp->nb_include_paths; ++a) {
+    res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
     if (res) {
       puts("ERR[793]"); // TODO
       return res;
     }
   }
-  for (int a = 0; a < ds->nb_cmdline_def_pairs; a += 2) {
-    tcc_define_symbol(ds->s1, ds->cmdline_defs[a], ds->cmdline_defs[a + 1]);
+  for (int a = 0; a < itp->nb_cmdline_def_pairs; a += 2) {
+    tcc_define_symbol(itp->s1, itp->cmdline_defs[a], itp->cmdline_defs[a + 1]);
   }
-  for (int a = 0; a < ds->nb_libraries; ++a) {
-    tcc_add_library(ds->s1, ds->libraries[a]);
+  for (int a = 0; a < itp->nb_libraries; ++a) {
+    tcc_add_library(itp->s1, itp->libraries[a]);
   }
-  tcc_set_output_type(ds->s1, TCC_OUTPUT_MEMORY);
-  tcc_set_error_func(ds->s1, stderr, tcci_handle_error);
+  tcc_set_output_type(itp->s1, TCC_OUTPUT_MEMORY);
+  tcc_set_error_func(itp->s1, stderr, tcci_handle_error);
 
   for (unsigned a = 0; a < nb_files; ++a) {
-    res = tcc_add_file(ds->s1, files[a]);
+    res = tcc_add_file(itp->s1, files[a]);
     if (res) {
       puts("ERR[831]: tcc_add_file"); // TODO
       return res;
     }
 
-    // tcc_add_file_internal(ds->s1, files[a], AFF_PRINT_ERROR | AFF_TYPE_C);
-    // tcc_compile(ds->s1, AFF_PRINT_ERROR | AFF_TYPE_C, files[a], 0);
+    // tcc_add_file_internal(itp->s1, files[a], AFF_PRINT_ERROR | AFF_TYPE_C);
+    // tcc_compile(itp->s1, AFF_PRINT_ERROR | AFF_TYPE_C, files[a], 0);
   }
 
   puts("...Relocating...");
-  res = tcci_relocate_into_memory(ds);
+  res = tcci_relocate_into_memory(itp);
 
-  tcc_delete(ds->s1);
+  tcc_delete(itp->s1);
 
   return res;
 }
 
-LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_name)
+LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *itp, const char *symbol_name)
 {
-  for (int i = 0; i < ds->nb_symbols; ++i) {
-    // printf("symbol_name='%s', ds->symbols[i]->name='%s'\n",symbol_name, ds->symbols[i]->name);
-    if (!strcmp(symbol_name, ds->symbols[i]->name)) {
-      return (void *)ds->symbols[i]->addr;
+  for (int i = 0; i < itp->nb_symbols; ++i) {
+    // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n",symbol_name, itp->symbols[i]->name);
+    if (!strcmp(symbol_name, itp->symbols[i]->name)) {
+      return (void *)itp->symbols[i]->addr;
     }
   }
   return NULL;
 }
 
-LIBTCCINTERPAPI void tcci_define_symbol(TCCInterpState *ds, const char *sym, const char *value)
+LIBTCCINTERPAPI void tcci_define_symbol(TCCInterpState *itp, const char *sym, const char *value)
 {
   // TODO -- because im subtracting from this array, its silly/redundant to send to a method that
   // will always be increasing its allocation based on its assumed highest number (which isnt true)
 
   char *str = tcc_strdup(sym);
-  dynarray_add(&ds->cmdline_defs, &ds->nb_cmdline_def_pairs, str);
+  dynarray_add(&itp->cmdline_defs, &itp->nb_cmdline_def_pairs, str);
 
   if (value)
     str = tcc_strdup(value);
   else
     str = NULL;
-  dynarray_add(&ds->cmdline_defs, &ds->nb_cmdline_def_pairs, str);
+  dynarray_add(&itp->cmdline_defs, &itp->nb_cmdline_def_pairs, str);
 }
 
 /* undefine a preprocessor symbol */
-LIBTCCINTERPAPI void tcci_undefine_symbol(TCCInterpState *ds, const char *sym)
+LIBTCCINTERPAPI void tcci_undefine_symbol(TCCInterpState *itp, const char *sym)
 {
-  for (int i = ds->nb_cmdline_def_pairs - 2; i >= 0; i -= 2) {
-    if (!strcmp(sym, ds->cmdline_defs[i])) {
+  for (int i = itp->nb_cmdline_def_pairs - 2; i >= 0; i -= 2) {
+    if (!strcmp(sym, itp->cmdline_defs[i])) {
       // Remove it
-      for (int j = i + 2; j < ds->nb_cmdline_def_pairs; ++j) {
-        ds->cmdline_defs[j - 2] = ds->cmdline_defs[j];
+      for (int j = i + 2; j < itp->nb_cmdline_def_pairs; ++j) {
+        itp->cmdline_defs[j - 2] = itp->cmdline_defs[j];
       }
-      ds->nb_cmdline_def_pairs -= 2;
+      itp->nb_cmdline_def_pairs -= 2;
     }
   }
 }
 
-LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr)
+LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *itp, const char *symbol_name, void *addr)
 {
   // tcc_load_object_file
   // TODO -- this method just redirects...
-  tcci_set_global_symbol(ds, symbol_name, STB_GLOBAL, STT_FUNC, addr);
+  tcci_set_global_symbol(itp, symbol_name, STB_GLOBAL, STT_FUNC, addr);
   // TCCISymbol *sym = NULL;
-  // for (int i = 0; i < ds->nb_symbols; ++i) {
-  //   if (!strcmp(symbol_name, ds->symbols[i]->name)) {
-  //     sym = ds->symbols[i]->name;
+  // for (int i = 0; i < itp->nb_symbols; ++i) {
+  //   if (!strcmp(symbol_name, itp->symbols[i]->name)) {
+  //     sym = itp->symbols[i]->name;
   //   }
   // }
 
@@ -1075,7 +1125,7 @@ LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name
   //   sym->name = tcc_strdup(symbol_name);
 
   //   printf(">>>>> added new symbol for '%s' @ %p\n", symbol_name, (void *)addr);
-  //   dynarray_add(&ds->symbols, &ds->nb_symbols, sym);
+  //   dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
   // }
 
   // // Set Properties

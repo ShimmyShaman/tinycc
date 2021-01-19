@@ -1285,6 +1285,7 @@ ST_FUNC void asm_instr(void)
 
 ST_FUNC void asm_global_instr(void)
 {
+    puts("5452");
     CString astr;
     int saved_nocode_wanted = nocode_wanted;
 

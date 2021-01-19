@@ -35,6 +35,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "help/hash_table.h"
+
 #ifndef _WIN32
 #define WIN32_LEAN_AND_MEAN 1
 #include <sys/time.h>
@@ -133,15 +135,15 @@ extern long double strtold(const char *__nptr, char **__endptr);
 /* preprocessor debug */
 /* #define PP_DEBUG */
 /* include file debug */
-/* #define INC_DEBUG */
+//  #define INC_DEBUG
 /* memory leak debug (only for single threaded usage) */
 /* #define MEM_DEBUG */
 /* assembler debug */
-/* #define ASM_DEBUG */
+//  #define ASM_DEBUG
 
 /* target selection */
 /* #define TCC_TARGET_I386   */  /* i386 code generator */
-/* #define TCC_TARGET_X86_64 */  /* x86-64 code generator */
+#define TCC_TARGET_X86_64        /* x86-64 code generator */
 /* #define TCC_TARGET_ARM    */  /* ARMv4 code generator */
 /* #define TCC_TARGET_ARM64  */  /* ARMv8 code generator */
 /* #define TCC_TARGET_C67    */  /* TMS320C67xx code generator */
@@ -1019,6 +1021,12 @@ struct TCCInterpState {
     unsigned offset, allocated;
     uint8_t *ptr;
   } plt;
+
+  struct {
+    hash_table_t hash_to_addr, addr_to_addr;
+    TCCISymbol *get_by_hash_sym, *get_by_addr_sym;
+    int do_subst;
+  } redir;
 };
 
 struct filespec {
@@ -1286,6 +1294,7 @@ enum tcc_token {
 
 /* ------------ libtcc.c ------------ */
 
+ST_DATA struct TCCInterpState *tcci_state = NULL;
 ST_DATA struct TCCState *tcc_state;
 
 /* public functions currently used by the tcc main function */

@@ -4804,7 +4804,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
   bt = st = -1;
   type->ref = NULL;
 
-  //   puts("parse_btype");
+  // puts("parse_btype");
   while (1) {
     // printf("tok:%i\n", tok);
     switch (tok) {
@@ -5478,6 +5478,202 @@ static void parse_builtin_params(int nc, const char *args)
     nocode_wanted--;
 }
 
+ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
+{
+  Sym sym;
+  CType ptype, type;
+  CValue v;
+  puts("=========subst_itp_yfn========");
+  printf("vtop=[%li] fhash:%lu\n", vtop - vstack, fh);
+
+  int ft = vtop->type.t;
+  Sym *was = vtop->type.ref;
+  vpop();
+
+  // Push the function address of get_ptr_by_function_name
+  sym.f.func_type = FUNC_NEW;
+  sym.c = 0;
+  type.ref = &sym;
+  type.t = VT_LLONG;
+  v.i = (uint64_t)tcci_state->redir.get_by_hash_sym->addr;
+  vsetc(&type, VT_CONST, &v);
+  vtop->r &= ~VT_LVAL; /* no lvalue */
+
+  // Push the function hash argument
+  ptype.ref = NULL;
+  ptype.t = TOK_CLLONG;
+  v.i = fh;
+  vsetc(&ptype, VT_CONST, &v);
+
+  // Call it
+  gfunc_call(1);
+
+  // Set fptr to top of stack
+  printf("ft:%i vtop=[%li] \n", ft, vtop - vstack);
+  type.t = VT_PTR;
+  type.ref = s;
+  v.i = 0;
+  vsetc(&type, 0, &v);
+  puts("===END===subst_itp_yfn===END==");
+  printf("vtop=[%li] \n", vtop - vstack);
+
+  /* function call */
+  // printf("t:%s\n", get_tok_str(t, NULL));
+  printf("vtop[%li]->type.t:%i %li\n", vtop - vstack, vtop->type.t, vtop->c.i);
+  printf("vtop->type.ref:%p\n", vtop->type.ref);
+  printf("r:%i r2:%i\n", vtop->r, vtop->r2);
+
+  //   if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
+  //     /* pointer test (no array accepted) */
+  //     if ((vtop->type.t & (VT_BTYPE | VT_ARRAY)) == VT_PTR) {
+  //       vtop->type = *pointed_type(&vtop->type);
+  //       printf("A.vtop[%li]->type.t:%i %li\n", vtop - vstack, vtop->type.t, vtop->c.i);
+  //       printf("A.vtop->type.ref:%i\n", vtop->type.ref->);
+  //       printf("A.r:%i r2:%i\n", vtop->r, vtop->r2);
+  //       if ((vtop->type.t & VT_BTYPE) != VT_FUNC)
+  //         goto error_func;
+  //     }
+  //     else {
+  //     error_func:
+  //       expect("function pointer");
+  //     }
+  //   }
+  //   else {
+  //     vtop->r &= ~VT_LVAL; /* no lvalue */
+  //   }
+  //   /* get return type */
+  //   s = vtop->type.ref;
+  SValue ret;
+  Sym *sa;
+  int r, t, size, align;
+  int nb_args, ret_nregs, ret_align, regsize, variadic;
+
+  printf("TOOM: %i\n", was->type.t);
+  next();
+  sa = s->next; /* first parameter */
+  nb_args = regsize = 0;
+  ret.r2 = VT_CONST;
+  /* compute first implicit argument if a structure is returned */
+  if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
+    puts("struct is returned");
+    expect("progress");
+    variadic = (s->f.func_type == FUNC_ELLIPSIS);
+    ret_nregs = gfunc_sret(&s->type, variadic, &ret.type, &ret_align, &regsize);
+    if (ret_nregs <= 0) {
+      /* get some space for the returned structure */
+      size = type_size(&s->type, &align);
+#ifdef TCC_TARGET_ARM64
+      /* On arm64, a small struct is return in registers.
+         It is much easier to write it to memory if we know
+         that we are allowed to write some extra bytes, so
+         round the allocated space up to a power of 2: */
+      if (size < 16)
+        while (size & (size - 1))
+          size = (size | (size - 1)) + 1;
+#endif
+      loc = (loc - size) & -align;
+      ret.type = s->type;
+      ret.r = VT_LOCAL | VT_LVAL;
+      /* pass it as 'int' to avoid structure arg passing
+         problems */
+      vseti(VT_LOCAL, loc);
+#ifdef CONFIG_TCC_BCHECK
+      if (tcc_state->do_bounds_check)
+        --loc;
+#endif
+      ret.c = vtop->c;
+      if (ret_nregs < 0)
+        vtop--;
+      else
+        nb_args++;
+    }
+  }
+  else {
+    ret_nregs = 1;
+    ret.type = s->type.ref->type;
+    printf("ret.type = (VT_TYPE)%i\n", ret.type.t);
+  }
+
+  if (ret_nregs > 0) {
+    /* return in register */
+    ret.c.i = 0;
+    PUT_R_RET(&ret, ret.type.t);
+  }
+  if (tok != ')') {
+    for (;;) {
+      expr_eq();
+      gfunc_param_typed(s, sa);
+      nb_args++;
+      if (sa)
+        sa = sa->next;
+      if (tok == ')')
+        break;
+      skip(',');
+    }
+  }
+  if (sa)
+    tcc_error("too few arguments to function");
+  skip(')');
+  gfunc_call(nb_args);
+
+  // expect("aftgfunc");
+  if (ret_nregs < 0) {
+    vsetc(&ret.type, ret.r, &ret.c);
+#ifdef TCC_TARGET_RISCV64
+    arch_transfer_ret_regs(1);
+#endif
+  }
+  else {
+    /* return value */
+    for (r = ret.r + ret_nregs + !ret_nregs; r-- > ret.r;) {
+      vsetc(&ret.type, r, &ret.c);
+      vtop->r2 = ret.r2; /* Loop only happens when r2 is VT_CONST */
+    }
+
+    /* handle packed struct return */
+    if (((s->type.t & VT_BTYPE) == VT_STRUCT) && ret_nregs) {
+      int addr, offset;
+
+      size = type_size(&s->type, &align);
+      /* We're writing whole regs often, make sure there's enough
+         space.  Assume register size is power of 2.  */
+      if (regsize > align)
+        align = regsize;
+      loc = (loc - size) & -align;
+      addr = loc;
+      offset = 0;
+      for (;;) {
+        vset(&ret.type, VT_LOCAL | VT_LVAL, addr + offset);
+        vswap();
+        vstore();
+        vtop--;
+        if (--ret_nregs == 0)
+          break;
+        offset += regsize;
+      }
+      vset(&s->type, VT_LOCAL | VT_LVAL, addr);
+    }
+
+    /* Promote char/short return values. This is matters only
+       for calling function that were not compiled by TCC and
+       only on some architectures.  For those where it doesn't
+       matter we expect things to be already promoted to int,
+       but not larger.  */
+    t = s->type.t & VT_BTYPE;
+    if (t == VT_BYTE || t == VT_SHORT || t == VT_BOOL) {
+#ifdef PROMOTE_RET
+      vtop->r |= BFVAL(VT_MUSTCAST, 1);
+#else
+      vtop->type.t = VT_INT;
+#endif
+    }
+  }
+  if (s->f.func_noreturn)
+    CODE_OFF();
+
+  // expect("progress end");
+}
+
 ST_FUNC void unary(void)
 {
   int n, t, align, size, r, sizeof_caller;
@@ -5495,7 +5691,7 @@ ST_FUNC void unary(void)
   /* XXX: GCC 2.95.3 does not generate a table although it should be
      better here */
 tok_next:
-  //  printf("tok:%i\n", tok);
+  // printf("tok:%i\n", tok);
   switch (tok) {
   case TOK_EXTENSION:
     next();
@@ -6018,6 +6214,8 @@ tok_next:
     if ((r & VT_VALMASK) < VT_CONST)
       r = (r & ~VT_VALMASK) | VT_LOCAL;
 
+    printf("u.t:%s\n", get_tok_str(t, NULL));
+    printf("u.s->type.t:%i ., r:%i, s->c:%i\n", s->type.t, r, s->c);
     vset(&s->type, r, s->c);
     /* Point to s as backpointer (even without r&VT_SYM).
        Will be used by at least the x86 inline asm parser for
@@ -6088,11 +6286,39 @@ tok_next:
       Sym *sa;
       int nb_args, ret_nregs, ret_align, regsize, variadic;
 
-      /* function call  */
+      // Interpreter Insert
+      if (tcci_state && tcci_state->redir.do_subst) {
+        if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
+          tcc_error("TODO:fptr");
+        }
+        else {
+          const char *f_name = get_tok_str(t, NULL);
+          s = sym_find(t);
+          if (s && (vtop->type.t & VT_EXTERN) != VT_EXTERN) {
+            printf("t:%s\n", get_tok_str(t, NULL));
+            printf("vtop[%li]->type.t:%i %li %i\n", vtop - vstack, vtop->type.t, vtop->c.i, vtop->type.ref->type.t);
+            // Replace the vtop name with a call to get_fptr(hashed_name)
+            // Remove
+            subst_itp_yfn(s, hash_djb2(f_name));
+
+            // tcc_error("TODO:progress");
+          }
+        }
+        break;
+      }
+
+      /* function call */
+      printf("t:%s\n", get_tok_str(t, NULL));
+      printf("vtop[%li]->type.t:%i %li\n", vtop - vstack, vtop->type.t, vtop->c.i);
+      printf("r:%i r2:%i\n", vtop->r, vtop->r2);
+
       if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
         /* pointer test (no array accepted) */
         if ((vtop->type.t & (VT_BTYPE | VT_ARRAY)) == VT_PTR) {
           vtop->type = *pointed_type(&vtop->type);
+          printf("A.vtop[%li]->type.t:%i %li\n", vtop - vstack, vtop->type.t, vtop->c.i);
+          printf("A.vtop->type.ref->r:%i\n", vtop->type.ref->r);
+          printf("A.r:%i r2:%i\n", vtop->r, vtop->r2);
           if ((vtop->type.t & VT_BTYPE) != VT_FUNC)
             goto error_func;
         }
@@ -6112,6 +6338,7 @@ tok_next:
       ret.r2 = VT_CONST;
       /* compute first implicit argument if a structure is returned */
       if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
+        puts("struct is returned");
         variadic = (s->f.func_type == FUNC_ELLIPSIS);
         ret_nregs = gfunc_sret(&s->type, variadic, &ret.type, &ret_align, &regsize);
         if (ret_nregs <= 0) {
@@ -6146,6 +6373,7 @@ tok_next:
       else {
         ret_nregs = 1;
         ret.type = s->type;
+        printf("ret.type = (VT_TYPE)%i\n", ret.type.t);
       }
 
       if (ret_nregs > 0) {
@@ -7002,6 +7230,7 @@ static void block(int is_expr)
 
 again:
   t = tok, next();
+  printf("block:tok:%i %i\n", t, tok);
 
   if (t == TOK_IF) {
     skip('(');
@@ -8248,6 +8477,7 @@ no_alloc:
    'cur_text_section' */
 static void gen_function(Sym *sym)
 {
+  printf("[BEG]gen_function: '%s'\n", get_tok_str(sym->v, NULL));
   struct scope f = {0};
   cur_scope = root_scope = &f;
   nocode_wanted = 0;
@@ -8289,10 +8519,12 @@ static void gen_function(Sym *sym)
   sym_pop(&all_cleanups, NULL, 0);
   /* patch symbol size */
   elfsym(sym)->st_size = ind - func_ind;
+  printf("symbol-size:%i\n", ind - func_ind);
   /* end of function */
   tcc_debug_funcend(tcc_state, ind - func_ind);
   /* It's better to crash than to generate wrong code */
   cur_text_section = NULL;
+  printf("[END]gen_function: '%s'\n", funcname);
   funcname = "";       /* for safety */
   func_vt.t = VT_VOID; /* for safety */
   func_var = 0;        /* for safety */

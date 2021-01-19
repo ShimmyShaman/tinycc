@@ -386,21 +386,21 @@ typedef struct TCCIFuncRel {
 //   unsigned nb_users;
 // } TCCIFunction;
 
-// static int tcci_allocate_runtime_memory(TCCInterpState *ds, unsigned required_size, u_char **ptr)
+// static int tcci_allocate_runtime_memory(TCCInterpState *itp, unsigned required_size, u_char **ptr)
 // {
 //   // Obtain the executable block of memory
 //   TCCIRuntimeMemory *rm;
 //   int e = 0, ai = -1;
 //   do {
 //     // Obtain the next runtime memory block
-//     if (e >= ds->nb_runtime_mem_blocks) {
+//     if (e >= itp->nb_runtime_mem_blocks) {
 //       rm = tcc_mallocz(sizeof(TCCIRuntimeMemory));
-//       rm->allocated = INTERP_RUNTIME_MEMORY_BASE_ALLOCATION * (1 << ds->nb_runtime_mem_blocks);
+//       rm->allocated = INTERP_RUNTIME_MEMORY_BASE_ALLOCATION * (1 << itp->nb_runtime_mem_blocks);
 //       if (rm->allocated < required_size) {
 //         rm->allocated = required_size + INTERP_RUNTIME_MEMORY_BASE_ALLOCATION;
 //       }
 //       rm->data = tcc_malloc(rm->allocated);
-//       set_pages_executable(ds->s1, (void *)rm->data, rm->allocated);
+//       set_pages_executable(itp->s1, (void *)rm->data, rm->allocated);
 
 //       rm->available.count = 0;
 //       rm->available.capacity = 32;
@@ -409,10 +409,10 @@ typedef struct TCCIFuncRel {
 //       rm->available.offsets[rm->available.count++] = 0;
 //       rm->available.offsets[rm->available.count++] = rm->allocated;
 
-//       dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, rm);
+//       dynarray_add(&itp->runtime_mem_blocks, &itp->nb_runtime_mem_blocks, rm);
 //     }
 //     else {
-//       rm = ds->runtime_mem_blocks[ds->nb_runtime_mem_blocks - 1];
+//       rm = itp->runtime_mem_blocks[itp->nb_runtime_mem_blocks - 1];
 //     }
 //     ++e;
 
@@ -440,38 +440,43 @@ typedef struct TCCIFuncRel {
 //   return 0;
 // }
 
-// static int tcci_allocate_runtime_function(TCCInterpState *ds, TCCIFile *file, ElfW(Sym) * sym, TCCIFunction **out)
+// static int tcci_allocate_runtime_function(TCCInterpState *itp, TCCIFile *file, ElfW(Sym) * sym, TCCIFunction **out)
 // {
-//   Section *strtab = ds->s1->symtab->link;
+//   Section *strtab = itp->s1->symtab->link;
 
 //   TCCIFunction *f = (TCCIFunction *)tcc_mallocz(sizeof(TCCIFunction));
 //   f->name = tcc_strdup((char *)strtab->data + sym->st_name);
 //   f->is_global_access = ELF64_ST_BIND(sym->st_info);
 //   f->runtime_size = sym->st_size;
 
-//   // tcci_allocate_runtime_memory(ds, f->runtime_size, &f->runtime_ptr);
+//   // tcci_allocate_runtime_memory(itp, f->runtime_size, &f->runtime_ptr);
 
 //   *out = f;
 //   return 0;
 // }
 
-void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding, u_char type, void *addr)
+void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char binding, u_char type, void *addr)
 {
   TCCISymbol *sym = NULL;
 
-  for (int a = 0; a < ds->nb_symbols; ++a) {
-    if (!strcmp(name, ds->symbols[a]->name)) {
-      sym = ds->symbols[a];
+  for (int a = 0; a < itp->nb_symbols; ++a) {
+    if (!strcmp(name, itp->symbols[a]->name)) {
+      sym = itp->symbols[a];
       printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, (void *)addr);
+
+      hash_table_set(name, (void *)addr, &itp->redir.hash_to_addr);
       break;
     }
   }
   if (!sym) {
     sym = tcc_mallocz(sizeof(TCCISymbol));
     sym->name = tcc_strdup(name);
+    long unsigned hash = hash_djb2(name);
 
-    // printf(">>>>> added new symbol for '%s' @ %p\n", name, (void *)addr);
-    dynarray_add(&ds->symbols, &ds->nb_symbols, sym);
+    printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, (void *)addr);
+    dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
+
+    hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);
   }
 
   // Set Properties
@@ -489,10 +494,10 @@ void tcci_set_global_symbol(TCCInterpState *ds, const char *name, u_char binding
   }
 }
 
-LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
+LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
 {
   usleep(100000);
-  TCCState *s1 = ds->s1;
+  TCCState *s1 = itp->s1;
   Section *s;
   unsigned offset, length, align, max_align, i, k, f;
   addr_t mem, addr;
@@ -543,18 +548,18 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
   //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
   //            .st_value);
   /* relocate symbols */
-  tcci_relocate_syms(ds, s1->symtab, !(s1->nostdlib), 0);
+  tcci_relocate_syms(itp, s1->symtab, !(s1->nostdlib), 0);
   if (s1->nb_errors)
     return 2;
 
   // printf("offset=%i max_align=%i\n", offset, max_align);
   void *ptr = tcc_malloc(offset + max_align);
-  if (ds->in_single_use_state) {
-    ds->single_use.runtime_mem = ptr;
+  if (itp->in_single_use_state) {
+    itp->single_use.runtime_mem = ptr;
   }
   else {
-    dynarray_add(&ds->runtime_mem_blocks, &ds->nb_runtime_mem_blocks, ptr);
-    ds->runtime_mem_size += (uint64_t)offset + max_align;
+    dynarray_add(&itp->runtime_mem_blocks, &itp->nb_runtime_mem_blocks, ptr);
+    itp->runtime_mem_size += (uint64_t)offset + max_align;
   }
   // printf("ptr @%p allocated:%i\n", ptr, offset + max_align);
 
@@ -592,7 +597,7 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
   //        (void *)((ElfW(Sym) *)symtab_section->data)[ELFW(R_SYM)(((ElfW_Rel *)text_section->reloc->data)->r_info)]
   //            .st_value);
   /* relocate symbols */
-  tcci_relocate_syms(ds, s1->symtab, !(s1->nostdlib), 1);
+  tcci_relocate_syms(itp, s1->symtab, !(s1->nostdlib), 1);
   if (s1->nb_errors)
     return 3;
 
@@ -647,7 +652,7 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     // }
   }
 
-  // Copy Info to ds from s1
+  // Copy Info to itp from s1
   ElfW(Sym) * sym;
   Section *symtab = symtab_section;
   for_each_elem(symtab, 1, sym, ElfW(Sym))
@@ -667,22 +672,22 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
     // printf("binding:%u type:%u st_shndx:%u st_value:%p\n", binding, type, sym->st_shndx,
     //        (void *)sym->st_value /*s1->sections[sym->st_shndx]->name,  */);
 
-    if (ds->in_single_use_state) {
-      if (ds->single_use.func_ptr) {
+    if (itp->in_single_use_state) {
+      if (itp->single_use.func_ptr) {
         // Only one should be set
         return 5;
       }
-      // printf("ds->single_use.func_ptr = (void *)sym->st_value(%p);\n", (void *)sym->st_value);
-      ds->single_use.func_ptr = (void *)sym->st_value;
+      // printf("itp->single_use.func_ptr = (void *)sym->st_value(%p);\n", (void *)sym->st_value);
+      itp->single_use.func_ptr = (void *)sym->st_value;
     }
     else {
-      tcci_set_global_symbol(ds, (char *)symtab->link->data + sym->st_name, binding, type, (void *)sym->st_value);
+      tcci_set_global_symbol(itp, (char *)symtab->link->data + sym->st_name, binding, type, (void *)sym->st_value);
     }
   }
 
   return 0;
 }
-//   TCCState *s1 = ds->s1;
+//   TCCState *s1 = itp->s1;
 //   Section *s;
 //   ElfW(Sym) * sym;
 //   unsigned offset, block_size, length, align, max_align, i, e, k, f;
@@ -700,9 +705,9 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 
 //   // Build global offset table
 //   build_got_entries(s1);
-//   ds->got.offset = 0U;
-//   ds->got.allocated = 1024; // TODO
-//   ds->got.ptr = tcc_malloc(ds->got.allocated);
+//   itp->got.offset = 0U;
+//   itp->got.allocated = 1024; // TODO
+//   itp->got.ptr = tcc_malloc(itp->got.allocated);
 
 //   // Relocate symbols
 //   for_each_elem(symtab, 1, sym, ElfW(Sym))
@@ -815,9 +820,9 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 
 // #if !defined(TCC_TARGET_PE) || defined(TCC_TARGET_MACHO)
 //   relocate_plt(s1);
-//   ds->plt.offset = 0U;
-//   ds->plt.allocated = 1024; // TODO
-//   ds->plt.ptr = tcc_malloc(ds->plt.allocated);
+//   itp->plt.offset = 0U;
+//   itp->plt.allocated = 1024; // TODO
+//   itp->plt.ptr = tcc_malloc(itp->plt.allocated);
 // #endif
 //   addr_t ptr_diff = 0; /* Selinux thing */
 
@@ -839,7 +844,7 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *ds)
 
 //     if (ELF64_ST_TYPE(sym->st_info) == STT_FUNC && sym->st_shndx == TEXT_SECTION_INDEX) {
 //       // Allocate function entry to the interpreter state
-//       tcci_allocate_runtime_function(ds, file_ref, sym, &pending_func_copies[nb_func_copies].ifunc);
+//       tcci_allocate_runtime_function(itp, file_ref, sym, &pending_func_copies[nb_func_copies].ifunc);
 //       pending_func_copies[nb_func_copies++].src_offset = sym->st_value;
 //     }
 //   }
