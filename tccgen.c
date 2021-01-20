@@ -5365,6 +5365,7 @@ static void gfunc_param_typed(Sym *func, Sym *arg)
   CType type;
 
   func_type = func->f.func_type;
+  dba(printf("func_type=%i\n", func_type));
   if (func_type == FUNC_OLD || (func_type == FUNC_ELLIPSIS && arg == NULL)) {
     /* default casting : only need to convert float to double */
     if ((vtop->type.t & VT_BTYPE) == VT_FLOAT) {
@@ -5544,8 +5545,8 @@ ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
       //   else {
       //     vtop->r &= ~VT_LVAL; /* no lvalue */
       //   }
-      //   /* get return type */
-      //   s = vtop->type.ref;
+        // /* get return type */
+        // s = was;
       SValue ret;
   Sym *sa;
   int r, t, size, align;
@@ -5553,7 +5554,7 @@ ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
 
   dba(printf("TOOM: %i\n", was->type.t));
   next();
-  sa = s->next; /* first parameter */
+  sa = was->next; /* first parameter */
   nb_args = regsize = 0;
   ret.r2 = VT_CONST;
   /* compute first implicit argument if a structure is returned */
@@ -5604,7 +5605,7 @@ ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
   if (tok != ')') {
     for (;;) {
       expr_eq();
-      gfunc_param_typed(s, sa);
+      gfunc_param_typed(was, sa);
       nb_args++;
       if (sa)
         sa = sa->next;
