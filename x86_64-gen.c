@@ -339,8 +339,9 @@ void load(int r, SValue *sv)
   SValue v2;
   sv = pe_getimport(sv, &v2);
 #endif
-  printf("load [vtop]->r:%i ->type.t:%i &~VT_DEFSIGN:%i ->c.i:%li\n", sv->r, sv->type.t, sv->type.t & ~VT_DEFSIGN,
-         sv->c.i);
+  if (tcci_state && tcci_state->debug_verbose)
+    printf("load [vtop]->r:%i ->type.t:%i &~VT_DEFSIGN:%i ->c.i:%li\n", sv->r, sv->type.t, sv->type.t & ~VT_DEFSIGN,
+           sv->c.i);
   fr = sv->r;
   ft = sv->type.t & ~VT_DEFSIGN;
   fc = sv->c.i;
@@ -643,7 +644,8 @@ void store(int r, SValue *v)
 /* 'is_jmp' is '1' if it is a jump */
 static void gcall_or_jmp(int is_jmp)
 {
-  printf("gcall/jmp vtop[%li]\n", vtop - vstack);
+  if (tcci_state && tcci_state->debug_verbose)
+    printf("gcall/jmp vtop[%li]\n", vtop - vstack);
   int r;
   if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST &&
       ((vtop->r & VT_SYM) && (vtop->c.i - 4) == (int)(vtop->c.i - 4))) {
@@ -651,14 +653,16 @@ static void gcall_or_jmp(int is_jmp)
 #ifdef TCC_TARGET_PE
     greloca(cur_text_section, vtop->sym, ind + 1, R_X86_64_PC32, (int)(vtop->c.i - 4));
 #else
-    printf("gcall/jmp is_jmp:%i vtop->sym:%p(%s) ind:%i vtop->c.i:%li\n", is_jmp, vtop->sym,
-           vtop->sym ? get_tok_str(vtop->type.t, NULL) : "null", ind, vtop->c.i);
+    if (tcci_state && tcci_state->debug_verbose)
+      printf("gcall/jmp is_jmp:%i vtop->sym:%p(%s) ind:%i vtop->c.i:%li\n", is_jmp, vtop->sym,
+             vtop->sym ? get_tok_str(vtop->type.t, NULL) : "null", ind, vtop->c.i);
     greloca(cur_text_section, vtop->sym, ind + 1, R_X86_64_PLT32, (int)(vtop->c.i - 4));
 #endif
     oad(0xe8 + is_jmp, 0); /* call/jmp im */
   }
   else {
-    printf("gcall/jmp [Indirect-call]\n");
+    if (tcci_state && tcci_state->debug_verbose)
+      printf("gcall/jmp [Indirect-call]\n");
     /* otherwise, indirect call */
     r = TREG_R11;
     load(r, vtop);
@@ -1141,7 +1145,8 @@ static X86_64_Mode classify_x86_64_arg(CType *ty, CType *ret, int *psize, int *p
   X86_64_Mode mode;
   int size, align, ret_t = 0;
 
-  printf("classify_x86_64_arg %i\n", ty->t & (VT_BITFIELD | VT_ARRAY));
+  if (tcci_state && tcci_state->debug_verbose)
+    printf("classify_x86_64_arg %i\n", ty->t & (VT_BITFIELD | VT_ARRAY));
   if (ty->t & (VT_BITFIELD | VT_ARRAY)) {
     *psize = 8;
     *palign = 8;
@@ -1272,7 +1277,8 @@ void gfunc_call(int nb_args)
   stack_adjust = 0;
   for (i = nb_args - 1; i >= 0; i--) {
     mode = classify_x86_64_arg(&vtop[-i].type, NULL, &size, &align, &reg_count);
-    printf("AFTER: size=%i align=%i reg_count=%i\n", size, align, reg_count);
+    if (tcci_state && tcci_state->debug_verbose)
+      printf("AFTER: size=%i align=%i reg_count=%i\n", size, align, reg_count);
     if (size == 0)
       continue;
     if (mode == x86_64_mode_sse && nb_sse_args + reg_count <= 8) {
@@ -1311,7 +1317,8 @@ void gfunc_call(int nb_args)
   sse_reg = nb_sse_args;
   args_size = 0;
   stack_adjust &= 15;
-  printf("gfunc_call : args:%i gen_reg:%i sse_reg:%i\n", nb_args, gen_reg, sse_reg);
+  if (tcci_state && tcci_state->debug_verbose)
+    printf("gfunc_call : args:%i gen_reg:%i sse_reg:%i\n", nb_args, gen_reg, sse_reg);
   for (i = k = 0; i < nb_args;) {
     mode = classify_x86_64_arg(&vtop[-i].type, NULL, &size, &align, &reg_count);
     if (size) {
@@ -1455,7 +1462,8 @@ void gfunc_call(int nb_args)
     }
   }
 
-  printf("superflame vtop->type.ref:%p\n", vtop->type.ref);
+  if (tcci_state && tcci_state->debug_verbose)
+    printf("superflame vtop->type.ref:%p\n", vtop->type.ref);
   if (vtop->type.ref->f.func_type != FUNC_NEW)    /* implies FUNC_OLD or FUNC_ELLIPSIS */
     oad(0xb8, nb_sse_args < 8 ? nb_sse_args : 8); /* mov nb_sse_args, %eax */
   gcall_or_jmp(0);

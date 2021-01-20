@@ -462,7 +462,7 @@ void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char bindin
   for (int a = 0; a < itp->nb_symbols; ++a) {
     if (!strcmp(name, itp->symbols[a]->name)) {
       sym = itp->symbols[a];
-      printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, (void *)addr);
+      dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, (void *)addr));
 
       hash_table_set(name, (void *)addr, &itp->redir.hash_to_addr);
       break;
@@ -473,7 +473,7 @@ void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char bindin
     sym->name = tcc_strdup(name);
     long unsigned hash = hash_djb2(name);
 
-    printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, (void *)addr);
+    dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, (void *)addr));
     dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
 
     hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);

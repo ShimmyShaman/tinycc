@@ -764,6 +764,8 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
   TCCInterpState *itp = tcc_mallocz(sizeof(TCCInterpState));
 
+  itp->debug_verbose = 0;
+
   // TODO -- add a param for expected function declarations &/ redefinitions?
   init_hash_table(1024, &itp->redir.hash_to_addr);
   init_hash_table(2048, &itp->redir.addr_to_addr);
@@ -774,13 +776,13 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
           "#include <stdio.h>\n"
           "\n"
           "void *%s(unsigned long hash) {\n"
-          "  printf(\"!!__tcci_get_fptr_by_fname_hash_!!\\nhash=%%lu\\n\", hash);\n"
+          // "  printf(\"!!__tcci_get_fptr_by_fname_hash_!!\\nhash=%%lu\\n\", hash);\n"
           "  void *fp = ((void *(*)(unsigned long, void *))%p)(hash, (void *)%p);\n"
-          "  printf(\"fp=%%p\\n\", fp);\n"
+          // "  printf(\"fp=%%p\\n\", fp);\n"
           "  return fp;\n"
           "}",
           fyf, &hash_table_get_by_hash, &itp->redir.hash_to_addr);
-  puts(buf);
+  // puts(buf);
   tcci_add_string(itp, "_tcci_init.gen", buf);
 
   itp->redir.get_by_hash_sym = NULL;
@@ -799,12 +801,12 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
   sprintf(buf,
           "#include <stdio.h>\n"
           "\n"
-          "void *getit() { return (void *)%p; }\n"
+          "int getint() { return 8; }\n"
           "\n"
           "void %s() {\n"
-          "  ((void (*)(void))getit())();\n"
+          "  int a = getint();\n"
           "}",
-          &hash_table_find, fyf);
+          fyf);
   tcci_add_string(itp, "_tcci_init.gen", buf);
   // DEBUG
   itp->redir.do_subst = 1;

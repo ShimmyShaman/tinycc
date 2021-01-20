@@ -49,6 +49,17 @@ extern float strtof(const char *__nptr, char **__endptr);
 extern long double strtold(const char *__nptr, char **__endptr);
 #endif
 
+/* DEBUG ITP */
+#define dbp(t)              \
+  if (tcci_state && tcci_state->debug_verbose) { \
+    puts(t);                \
+  }
+#define dba(t)              \
+  if (tcci_state && tcci_state->debug_verbose) { \
+    t;                \
+  }
+/* END DEBUG ITP */
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <direct.h> /* getcwd */
@@ -991,6 +1002,7 @@ struct TCCInterpState {
   TCCState *s1;
 
   unsigned char warn_error;
+  int debug_verbose;
 
   void **runtime_mem_blocks; /* pointer to execution text blocks */
   int nb_runtime_mem_blocks; /* number thereof */
