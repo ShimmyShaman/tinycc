@@ -766,49 +766,87 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 
   itp->debug_verbose = 0;
 
-  // TODO -- add a param for expected function declarations &/ redefinitions?
-  init_hash_table(1024, &itp->redir.hash_to_addr);
-  init_hash_table(2048, &itp->redir.addr_to_addr);
-  itp->redir.do_subst = 0;
   char fyf[32], buf[512];
-  strcpy(fyf, "__tcci_get_fptr_by_fname_hash_");
-  sprintf(buf,
-          "#include <stdio.h>\n"
-          "\n"
-          "void *%s(unsigned long hash) {\n"
-          // "  printf(\"!!__tcci_get_fptr_by_fname_hash_!!\\nhash=%%lu\\n\", hash);\n"
-          "  void *fp = ((void *(*)(unsigned long, void *))%p)(hash, (void *)%p);\n"
-          // "  printf(\"fp=%%p\\n\", fp);\n"
-          "  return fp;\n"
-          "}",
-          fyf, &hash_table_get_by_hash, &itp->redir.hash_to_addr);
-  // puts(buf);
-  tcci_add_string(itp, "_tcci_init.gen", buf);
+  itp->redir.do_subst = 0;
+  {
+    // Hash-To-Addr
+    // TODO -- add a param for expected function declarations &/ redefinitions?
+    init_hash_table(1024, &itp->redir.hash_to_addr);
 
-  itp->redir.get_by_hash_sym = NULL;
-  for (int i = 0; i < itp->nb_symbols; ++i) {
-    if (!strcmp(fyf, itp->symbols[i]->name)) {
-      // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
-      itp->redir.get_by_hash_sym = itp->symbols[i];
+    strcpy(fyf, "__tcci_get_fptr_by_fname_hash_");
+    sprintf(buf,
+            "#include <stdio.h>\n"
+            "\n"
+            "void *%s(unsigned long hash) {\n"
+            // "  printf(\"!!__tcci_get_fptr_by_fname_hash_!!\\nhash=%%lu\\n\", hash);\n"
+            "  void *fp = ((void *(*)(unsigned long, void *))%p)(hash, (void *)%p);\n"
+            // "  printf(\"fp=%%p\\n\", fp);\n"
+            "  return fp;\n"
+            "}",
+            fyf, &hash_table_get_by_hash, &itp->redir.hash_to_addr);
+    // puts(buf);
+    tcci_add_string(itp, "_tcci_init_a.gen", buf);
+
+    itp->redir.get_by_hash_sym = NULL;
+    for (int i = 0; i < itp->nb_symbols; ++i) {
+      if (!strcmp(fyf, itp->symbols[i]->name)) {
+        // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
+        itp->redir.get_by_hash_sym = itp->symbols[i];
+      }
     }
+    if (!itp->redir.get_by_hash_sym)
+      expect("itp->redir.get_by_hash_sym not NULL");
+    // itp->redir.get_by_hash_fptr = (void *)tcci_get_symbol(itp, fyf);
   }
-  if (!itp->redir.get_by_hash_sym)
-    expect("itp->redir.get_by_hash_sym not NULL");
-  // itp->redir.get_by_hash_fptr = (void *)tcci_get_symbol(itp, fyf);
+  {
+    // Addr-To-Addr
+    init_hash_table(2048, &itp->redir.addr_to_addr);
 
-  // DEBUG
-  strcpy(fyf, "DooDop");
-  sprintf(buf,
-          "#include <stdio.h>\n"
-          "\n"
-          "int getint() { return 8; }\n"
-          "\n"
-          "void %s() {\n"
-          "  int a = getint();\n"
-          "}",
-          fyf);
-  tcci_add_string(itp, "_tcci_init.gen", buf);
-  // DEBUG
+    strcpy(fyf, "__tcci_get_fptr_by_prev_addr_");
+    sprintf(buf,
+            "#include <stdio.h>\n"
+            "\n"
+            "void *%s(void *prev_addr) {\n"
+            // "  printf(\"!!__tcci_get_fptr_by_prev_addr_!!\\nprev_addr=%%p\\n\", prev_addr);\n"
+            "  void *fp = prev_addr;\n"
+            "  while(prev_addr = ((void *(*)(unsigned long, void *))%p)((unsigned long)prev_addr, (void *)%p)) {\n"
+            // "    printf(\"--redirecting=>%%p\\n\", prev_addr);\n"
+            "    fp = prev_addr;\n"
+            "  }\n"
+            // "  printf(\"fp=%%p\\n\", fp);\n"
+            "  return fp;\n"
+            "}",
+            fyf, &hash_table_get_by_hash, &itp->redir.addr_to_addr);
+    // puts(buf);
+    tcci_add_string(itp, "_tcci_init_b.gen", buf);
+
+    itp->redir.get_by_addr_sym = NULL;
+    for (int i = 0; i < itp->nb_symbols; ++i) {
+      if (!strcmp(fyf, itp->symbols[i]->name)) {
+        // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
+        itp->redir.get_by_addr_sym = itp->symbols[i];
+      }
+    }
+    if (!itp->redir.get_by_addr_sym)
+      expect("itp->redir.get_by_addr_sym not NULL");
+  }
+
+  // // DEBUG
+  // itp->debug_verbose = 1;
+  // strcpy(fyf, "DooDop");
+  // sprintf(buf,
+  //         "#include <stdio.h>\n"
+  //         "\n"
+  //         "int getint() { return 8; }\n"
+  //         "\n"
+  //         "void %s() {\n"
+  //         "  int (*chilli)(void) = &getint;\n"
+  //         "  int a = chilli();\n"
+  //         "}",
+  //         fyf);
+  // tcci_add_string(itp, "_tcci_init.gen", buf);
+  // itp->debug_verbose = 0;
+  // // DEBUG
   itp->redir.do_subst = 1;
 
   return itp;

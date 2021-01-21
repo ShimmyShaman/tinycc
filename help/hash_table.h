@@ -37,6 +37,7 @@ hash_table_entry_t *hash_table_find(unsigned long hash, hash_table_t *hash_table
 void hash_table_maybe_grow(size_t new_n, hash_table_t *hash_table);
 int hash_table_exists(const char *name, hash_table_t *hash_table);
 void hash_table_set(const char *name, void *val, hash_table_t *hash_table);
+void hash_table_set_by_hash(unsigned long hash, void *val, hash_table_t *hash_table);
 void *hash_table_get(const char *name, hash_table_t *hash_table);
 void *hash_table_get_by_hash(unsigned long hash, hash_table_t *hash_table);
 // }

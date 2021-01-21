@@ -192,6 +192,24 @@ void hash_table_set(const char *name, void *val, hash_table_t *hash_table)
   } while (ht_insert != HASH_TABLE_SUCCESS);
 }
 
+void hash_table_set_by_hash(unsigned long hash, void *val, hash_table_t *hash_table)
+{
+  hash_table_entry_t *entry = hash_table_find(hash, hash_table);
+  if (entry) {
+    entry->value = val;
+    return;
+  }
+
+  /* Expand if necessary
+   * Grow until the element has been added
+   */
+  long ht_insert;
+  do {
+    hash_table_maybe_grow(hash_table->n + 1, hash_table);
+    ht_insert = hash_table_insert(hash, val, hash_table);
+  } while (ht_insert != HASH_TABLE_SUCCESS);
+}
+
 void *hash_table_get(const char *name, hash_table_t *hash_table)
 {
   unsigned long hash = hash_djb2((const unsigned char *)name);

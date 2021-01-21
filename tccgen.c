@@ -5479,15 +5479,205 @@ static void parse_builtin_params(int nc, const char *args)
     nocode_wanted--;
 }
 
-ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
+ST_FUNC void subst_itp_by_faddr()
+{
+  dba({ puts("=========subst_itp_by_faddr========"); });
+
+  // Replace the previous
+  CType was_type = vtop->type;
+  CValue was_val = vtop->c;
+  vpop();
+
+  dba(printf("was: type.t:%i type.ref:%p ->c:%li\n", was_type.t, was_type.ref, was_val.i);
+      if (was_type.ref) { printf("was: was_type.ref->type.t:%i\n", was_type.ref->type.t); });
+
+  Sym sym;
+  CType ptype, type;
+  CValue v;
+
+  // Push the function address of get_ptr_by_prev_addr
+  sym.f.func_type = FUNC_NEW;
+  sym.c = 0;
+  type.ref = &sym;
+  type.t = VT_LLONG;
+  v.i = (uint64_t)tcci_state->redir.get_by_addr_sym->addr;
+  vsetc(&type, VT_CONST, &v);
+  vtop->r &= ~VT_LVAL; /* no lvalue */
+
+  // Push the function hash argument
+  ptype.ref = was_type.ref;
+  ptype.t = TOK_CLLONG;
+  vsetc(&was_type, VT_LVAL | VT_LOCAL, &was_val);
+
+  // Call it
+  gfunc_call(1);
+
+  // Set fptr to top of stack
+  type.t = VT_PTR;
+  type.ref = was_type.ref;
+  v.i = 0;
+  vsetc(&type, 0, &v);
+
+  /* function ptr call */
+  // printf("t:%s\n", get_tok_str(t, NULL));
+  dba({
+    printf("vtop[%li]->type.t:%i %li\n", vtop - vstack, vtop->type.t, vtop->c.i);
+    printf("vtop->type.ref:%p\n", vtop->type.ref);
+    printf("r:%i r2:%i\n", vtop->r, vtop->r2);
+  });
+
+  /* pointer test (no array accepted) */
+  if ((vtop->type.t & (VT_BTYPE | VT_ARRAY)) == VT_PTR) {
+    vtop->type = *pointed_type(&vtop->type);
+    dba(printf("A.vtop[%li]->type.t:%i %li\n", vtop - vstack, vtop->type.t, vtop->c.i);
+        printf("A.vtop->type.ref->r:%i\n", vtop->type.ref->r); printf("A.r:%i r2:%i\n", vtop->r, vtop->r2););
+    if ((vtop->type.t & VT_BTYPE) != VT_FUNC)
+      expect("function pointer");
+  }
+  else {
+    expect("function pointer");
+  }
+
+  SValue ret;
+  Sym *s, *sa;
+  int r, t, size, align;
+  int nb_args, ret_nregs, ret_align, regsize, variadic;
+
+  /* get return type */
+  s = was_type.ref->type.ref;
+  next();
+  sa = s->next; /* first parameter */
+  nb_args = regsize = 0;
+  ret.r2 = VT_CONST;
+  /* compute first implicit argument if a structure is returned */
+  if ((s->type.t & VT_BTYPE) == VT_STRUCT) {
+    dbp("struct is returned");
+    variadic = (s->f.func_type == FUNC_ELLIPSIS);
+    ret_nregs = gfunc_sret(&s->type, variadic, &ret.type, &ret_align, &regsize);
+    if (ret_nregs <= 0) {
+      /* get some space for the returned structure */
+      size = type_size(&s->type, &align);
+#ifdef TCC_TARGET_ARM64
+      /* On arm64, a small struct is return in registers.
+         It is much easier to write it to memory if we know
+         that we are allowed to write some extra bytes, so
+         round the allocated space up to a power of 2: */
+      if (size < 16)
+        while (size & (size - 1))
+          size = (size | (size - 1)) + 1;
+#endif
+      loc = (loc - size) & -align;
+      ret.type = s->type;
+      ret.r = VT_LOCAL | VT_LVAL;
+      /* pass it as 'int' to avoid structure arg passing
+         problems */
+      vseti(VT_LOCAL, loc);
+#ifdef CONFIG_TCC_BCHECK
+      if (tcc_state->do_bounds_check)
+        --loc;
+#endif
+      ret.c = vtop->c;
+      if (ret_nregs < 0)
+        vtop--;
+      else
+        nb_args++;
+    }
+  }
+  else {
+    ret_nregs = 1;
+    ret.type = s->type;
+    dba(printf("ret.type = (VT_TYPE)%i\n", ret.type.t));
+  }
+
+  if (ret_nregs > 0) {
+    /* return in register */
+    ret.c.i = 0;
+    PUT_R_RET(&ret, ret.type.t);
+  }
+  if (tok != ')') {
+    for (;;) {
+      expr_eq();
+      gfunc_param_typed(was_type.ref->type.ref, sa);
+      nb_args++;
+      if (sa)
+        sa = sa->next;
+      if (tok == ')')
+        break;
+      skip(',');
+    }
+  }
+  if (sa)
+    tcc_error("too few arguments to function");
+  skip(')');
+  gfunc_call(nb_args);
+
+  if (ret_nregs < 0) {
+    vsetc(&ret.type, ret.r, &ret.c);
+#ifdef TCC_TARGET_RISCV64
+    arch_transfer_ret_regs(1);
+#endif
+  }
+  else {
+    /* return value */
+    for (r = ret.r + ret_nregs + !ret_nregs; r-- > ret.r;) {
+      vsetc(&ret.type, r, &ret.c);
+      vtop->r2 = ret.r2; /* Loop only happens when r2 is VT_CONST */
+    }
+
+    /* handle packed struct return */
+    if (((s->type.t & VT_BTYPE) == VT_STRUCT) && ret_nregs) {
+      int addr, offset;
+
+      size = type_size(&s->type, &align);
+      /* We're writing whole regs often, make sure there's enough
+         space.  Assume register size is power of 2.  */
+      if (regsize > align)
+        align = regsize;
+      loc = (loc - size) & -align;
+      addr = loc;
+      offset = 0;
+      for (;;) {
+        vset(&ret.type, VT_LOCAL | VT_LVAL, addr + offset);
+        vswap();
+        vstore();
+        vtop--;
+        if (--ret_nregs == 0)
+          break;
+        offset += regsize;
+      }
+      vset(&s->type, VT_LOCAL | VT_LVAL, addr);
+    }
+
+    /* Promote char/short return values. This is matters only
+       for calling function that were not compiled by TCC and
+       only on some architectures.  For those where it doesn't
+       matter we expect things to be already promoted to int,
+       but not larger.  */
+    t = s->type.t & VT_BTYPE;
+    if (t == VT_BYTE || t == VT_SHORT || t == VT_BOOL) {
+#ifdef PROMOTE_RET
+      vtop->r |= BFVAL(VT_MUSTCAST, 1);
+#else
+      vtop->type.t = VT_INT;
+#endif
+    }
+  }
+  if (s->f.func_noreturn)
+    CODE_OFF();
+
+  // expect("progress");
+  dbp("===END===subst_itp_by_faddr===END==");
+}
+
+ST_FUNC void subst_itp_by_fname(Sym *s, uint64_t fh)
 {
   Sym sym;
   CType ptype, type;
   CValue v;
-  if (tcci_state && tcci_state->debug_verbose) {
-    puts("=========subst_itp_yfn========");
+  dba({
+    puts("=========subst_itp_by_fname========");
     printf("vtop=[%li] fhash:%lu\n", vtop - vstack, fh);
-  }
+  });
 
   int ft = vtop->type.t;
   Sym *was = vtop->type.ref;
@@ -5545,8 +5735,8 @@ ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
       //   else {
       //     vtop->r &= ~VT_LVAL; /* no lvalue */
       //   }
-        // /* get return type */
-        // s = was;
+      // /* get return type */
+      // s = was;
       SValue ret;
   Sym *sa;
   int r, t, size, align;
@@ -5680,7 +5870,7 @@ ST_FUNC void subst_itp_yfn(Sym *s, uint64_t fh)
     CODE_OFF();
 
   // expect("progress end");
-  dbp("===END===subst_itp_yfn===END==");
+  dbp("===END===subst_itp_by_fname===END==");
 }
 
 ST_FUNC void unary(void)
@@ -6244,6 +6434,7 @@ tok_next:
 
   /* post operations */
   while (1) {
+    // dba(printf("tok=%i\n", tok));
     if (tok == TOK_INC || tok == TOK_DEC) {
       inc(1, tok);
       next();
@@ -6301,7 +6492,8 @@ tok_next:
       if (tcci_state && tcci_state->redir.do_subst) {
         /* Interpreter Insert */
         if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
-          tcc_error("TODO:fptr");
+          subst_itp_by_faddr();
+          continue;
         }
         else {
           const char *f_name = get_tok_str(t, NULL);
@@ -6313,7 +6505,7 @@ tok_next:
             }
             // Replace the vtop name with a call to get_fptr(hashed_name)
             // Remove
-            subst_itp_yfn(s, hash_djb2(f_name));
+            subst_itp_by_fname(s, hash_djb2(f_name));
 
             // printf("tok:%i\n", tok);
             continue;

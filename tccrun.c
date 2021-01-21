@@ -458,22 +458,25 @@ typedef struct TCCIFuncRel {
 void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char binding, u_char type, void *addr)
 {
   TCCISymbol *sym = NULL;
+  long unsigned hash = hash_djb2(name);
 
+  // TODO -- just use the hash tables here???
   for (int a = 0; a < itp->nb_symbols; ++a) {
     if (!strcmp(name, itp->symbols[a]->name)) {
       sym = itp->symbols[a];
-      dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, (void *)addr));
+      dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, addr));
 
-      hash_table_set(name, (void *)addr, &itp->redir.hash_to_addr);
+      void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
+      hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
+      hash_table_set_by_hash((unsigned long)prev_addr, addr, &itp->redir.addr_to_addr);
       break;
     }
   }
   if (!sym) {
     sym = tcc_mallocz(sizeof(TCCISymbol));
     sym->name = tcc_strdup(name);
-    long unsigned hash = hash_djb2(name);
 
-    dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, (void *)addr));
+    dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, addr));
     dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
 
     hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);
@@ -496,7 +499,6 @@ void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char bindin
 
 LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
 {
-  usleep(100000);
   TCCState *s1 = itp->s1;
   Section *s;
   unsigned offset, length, align, max_align, i, k, f;
