@@ -5669,14 +5669,25 @@ ST_FUNC void subst_itp_by_faddr()
   dbp("===END===subst_itp_by_faddr===END==");
 }
 
-ST_FUNC void subst_itp_by_fname(Sym *s, uint64_t fh)
+ST_FUNC void subst_itp_by_fname(int tok_ident)
 {
-  Sym sym;
+  // s = sym_find(t);s, hash_djb2(f_name)
+  Sym *fsym, sym;
   CType ptype, type;
   CValue v;
+
+  fsym = sym_find(tok_ident);
+  const char *ident_name = get_tok_str(tok_ident, NULL);
+  if (fsym->type.t) {
+    
+    // tcc_state->current_filename
+    // then multiply by the hash below
+  }
+  unsigned long fh = hash_djb2(ident_name);
+
   dba({
     puts("=========subst_itp_by_fname========");
-    printf("vtop=[%li] fhash:%lu\n", vtop - vstack, fh);
+    printf("vtop=[%li] name:%s(%lu)\n", vtop - vstack, ident_name, fh);
   });
 
   int ft = vtop->type.t;
@@ -5703,9 +5714,9 @@ ST_FUNC void subst_itp_by_fname(Sym *s, uint64_t fh)
 
   // Set fptr to top of stack
   if (tcci_state && tcci_state->debug_verbose)
-    printf("ft:%i vtop=[%li] %i\n", ft, vtop - vstack, s->r);
+    printf("ft:%i vtop=[%li] %i\n", ft, vtop - vstack, fsym->r);
   type.t = VT_PTR;
-  type.ref = s;
+  type.ref = fsym;
   v.i = 0;
   vsetc(&type, 0, &v);
 
@@ -5782,7 +5793,7 @@ ST_FUNC void subst_itp_by_fname(Sym *s, uint64_t fh)
   }
   else {
     ret_nregs = 1;
-    ret.type = s->type.ref->type;
+    ret.type = fsym->type.ref->type;
     if (tcci_state && tcci_state->debug_verbose)
       printf("ret.type = (VT_TYPE)%i\n", ret.type.t);
   }
@@ -5850,7 +5861,7 @@ ST_FUNC void subst_itp_by_fname(Sym *s, uint64_t fh)
       t = was->type.t & VT_BTYPE;
     }
     else {
-      t = s->type.t & VT_BTYPE;
+      t = fsym->type.t & VT_BTYPE;
     }
 
     /* ^^ Promote char/short return values. This is matters only
@@ -5866,7 +5877,7 @@ ST_FUNC void subst_itp_by_fname(Sym *s, uint64_t fh)
 #endif
     }
   }
-  if (s->f.func_noreturn)
+  if (fsym->f.func_noreturn)
     CODE_OFF();
 
   // expect("progress end");
@@ -5890,7 +5901,6 @@ ST_FUNC void unary(void)
   /* XXX: GCC 2.95.3 does not generate a table although it should be
      better here */
 tok_next:
-  // printf("tok:%i\n", tok);
   switch (tok) {
   case TOK_EXTENSION:
     next();
@@ -6434,6 +6444,7 @@ tok_next:
 
   /* post operations */
   while (1) {
+    // printf("tok:%i\n", tok);
     // dba(printf("tok=%i\n", tok));
     if (tok == TOK_INC || tok == TOK_DEC) {
       inc(1, tok);
@@ -6484,11 +6495,13 @@ tok_next:
       skip(']');
     }
     else if (tok == '(') {
+      // printf("tok:%i\n", tok);
       SValue ret;
       Sym *sa;
       int nb_args, ret_nregs, ret_align, regsize, variadic;
 
       /* function call */
+      // printf("tcci_state:%p\n", tcci_state);
       if (tcci_state && tcci_state->redir.do_subst) {
         /* Interpreter Insert */
         if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
@@ -6496,16 +6509,20 @@ tok_next:
           continue;
         }
         else {
-          const char *f_name = get_tok_str(t, NULL);
-          s = sym_find(t);
-          if (s && (vtop->type.t & VT_EXTERN) != VT_EXTERN) {
-            if (tcci_state && tcci_state->debug_verbose) {
-              printf("t:%s\n", get_tok_str(t, NULL));
-              printf("vtop[%li]->type.t:%i %li %i\n", vtop - vstack, vtop->type.t, vtop->c.i, vtop->type.ref->type.t);
+          // const char *f_name = get_tok_str(t, NULL);
+          // s = sym_find(t);s, hash_djb2(f_name)
+
+          // printf("t:%s\n", get_tok_str(t, NULL));
+          if (s && (vtop->type.t & VT_EXTERN) != VT_EXTERN && (vtop->type.t & VT_INLINE) != VT_INLINE) {
+            {
+              // puts("set");
+              // printf("t:%s\n", get_tok_str(t, NULL));
+              // printf("vtop[%li]->type.t:%i %li %i\n", vtop - vstack, vtop->type.t, vtop->c.i,
+              // vtop->type.ref->type.t);
             }
             // Replace the vtop name with a call to get_fptr(hashed_name)
             // Remove
-            subst_itp_by_fname(s, hash_djb2(f_name));
+            subst_itp_by_fname(t);
 
             // printf("tok:%i\n", tok);
             continue;

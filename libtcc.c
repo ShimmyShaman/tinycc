@@ -780,6 +780,8 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
             "void *%s(unsigned long hash) {\n"
             // "  printf(\"!!__tcci_get_fptr_by_fname_hash_!!\\nhash=%%lu\\n\", hash);\n"
             "  void *fp = ((void *(*)(unsigned long, void *))%p)(hash, (void *)%p);\n"
+            "  if(!fp)\n"
+            "    puts(\"ERROR -__tcci_get_fptr_by_fname_hash_- Couldn't Find Function Hash Symbol!!!\\n\");\n"
             // "  printf(\"fp=%%p\\n\", fp);\n"
             "  return fp;\n"
             "}",
@@ -954,6 +956,8 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
 
   // if (!res) {
   itp->s1->string_filename = filename;
+  // itp->s1->filetype = 17;
+  // printf("tcc_add_file, flags:%i\n", itp->s1->filetype);
   res = tcc_compile(itp->s1, itp->s1->filetype, str, -1);
 
   if (!res) {
@@ -961,6 +965,48 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
     res = tcci_relocate_into_memory(itp);
   }
   // }
+
+  tcc_delete(itp->s1);
+  tcci_state = NULL;
+
+  return res;
+}
+
+LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsigned nb_files)
+{
+  int res;
+
+  tcci_state = itp;
+  itp->s1 = tcc_new();
+  for (int a = 0; a < itp->nb_include_paths; ++a) {
+    res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
+    if (res) {
+      puts("ERR[793]"); // TODO
+      return res;
+    }
+  }
+  for (int a = 0; a < itp->nb_cmdline_def_pairs; a += 2) {
+    tcc_define_symbol(itp->s1, itp->cmdline_defs[a], itp->cmdline_defs[a + 1]);
+  }
+  for (int a = 0; a < itp->nb_libraries; ++a) {
+    tcc_add_library(itp->s1, itp->libraries[a]);
+  }
+  tcc_set_output_type(itp->s1, TCC_OUTPUT_MEMORY);
+  tcc_set_error_func(itp->s1, stderr, tcci_handle_error);
+
+  for (unsigned a = 0; a < nb_files; ++a) {
+    res = tcc_add_file(itp->s1, files[a]);
+    if (res) {
+      puts("ERR[831]: tcc_add_file"); // TODO
+      return res;
+    }
+
+    // tcc_add_file_internal(itp->s1, files[a], AFF_PRINT_ERROR | AFF_TYPE_C);
+    // tcc_compile(itp->s1, AFF_PRINT_ERROR | AFF_TYPE_C, files[a], 0);
+  }
+
+  puts("...Relocating...");
+  res = tcci_relocate_into_memory(itp);
 
   tcc_delete(itp->s1);
   tcci_state = NULL;
@@ -1065,46 +1111,6 @@ includes_complete:
   itp->single_use.func_ptr = NULL;
 
   itp->in_single_use_state = prv_igv;
-  return res;
-}
-
-LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsigned nb_files)
-{
-  int res;
-
-  itp->s1 = tcc_new();
-  for (int a = 0; a < itp->nb_include_paths; ++a) {
-    res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
-    if (res) {
-      puts("ERR[793]"); // TODO
-      return res;
-    }
-  }
-  for (int a = 0; a < itp->nb_cmdline_def_pairs; a += 2) {
-    tcc_define_symbol(itp->s1, itp->cmdline_defs[a], itp->cmdline_defs[a + 1]);
-  }
-  for (int a = 0; a < itp->nb_libraries; ++a) {
-    tcc_add_library(itp->s1, itp->libraries[a]);
-  }
-  tcc_set_output_type(itp->s1, TCC_OUTPUT_MEMORY);
-  tcc_set_error_func(itp->s1, stderr, tcci_handle_error);
-
-  for (unsigned a = 0; a < nb_files; ++a) {
-    res = tcc_add_file(itp->s1, files[a]);
-    if (res) {
-      puts("ERR[831]: tcc_add_file"); // TODO
-      return res;
-    }
-
-    // tcc_add_file_internal(itp->s1, files[a], AFF_PRINT_ERROR | AFF_TYPE_C);
-    // tcc_compile(itp->s1, AFF_PRINT_ERROR | AFF_TYPE_C, files[a], 0);
-  }
-
-  puts("...Relocating...");
-  res = tcci_relocate_into_memory(itp);
-
-  tcc_delete(itp->s1);
-
   return res;
 }
 
@@ -1609,6 +1615,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
   else {
     /* update target deps */
     dynarray_add(&s1->target_deps, &s1->nb_target_deps, tcc_strdup(filename));
+    // printf("tcc_add_file, flags:%i fd:%i\n", flags, fd);
     ret = tcc_compile(s1, flags, filename, fd);
   }
   s1->current_filename = NULL;

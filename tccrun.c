@@ -465,6 +465,7 @@ void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char bindin
     if (!strcmp(name, itp->symbols[a]->name)) {
       sym = itp->symbols[a];
       dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, addr));
+      // printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, addr);
 
       void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
       hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
@@ -477,6 +478,7 @@ void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char bindin
     sym->name = tcc_strdup(name);
 
     dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, addr));
+    // printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, addr);
     dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
 
     hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);
@@ -659,6 +661,13 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
   Section *symtab = symtab_section;
   for_each_elem(symtab, 1, sym, ElfW(Sym))
   {
+    u_char typeb = ELF64_ST_TYPE(sym->st_info);
+    if (typeb == STT_FUNC) {
+      printf("symtab:%p %i\n", symtab, sym->st_shndx);
+      printf("symtab->link:%p binding:%u\n", symtab->link, ELF64_ST_BIND(sym->st_info));
+      printf("sym->st_name:%s\n", (char *)symtab->link->data + sym->st_name);
+    }
+
     u_char binding = ELF64_ST_BIND(sym->st_info);
     if (binding != STB_GLOBAL)
       continue;

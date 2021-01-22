@@ -43,6 +43,41 @@ void _test_int_func_replace(TCCInterpState *itp)
   MCtest(doit(414));
 }
 
+void _test_int_func_replace_mem_alloc(TCCInterpState *itp)
+{
+  char buf[2048];
+  sprintf(buf, "#include <stdio.h>\n""#include <stdlib.h>\n"
+               "\n"
+               "int _getnb(void) {\n"
+               "  return 7;\n"
+               "}\n"
+               "\n"
+               "int doit(int expect) {\n"
+               "  int a = _getnb();\n"
+               "  int *m = (int *)malloc(sizeof(int) * 64256654);\n"
+               "  m[424422] = a;\n"
+               "  return m[424422] - expect;\n"
+               "}\n");
+  MCtest(tcci_add_string(itp, "printings.c", buf));
+
+  dbp("####### Invoking doit() #######");
+
+  // -- invoke the address
+  int (*doit)(int) = (int (*)(int))tcci_get_symbol(itp, "doit");
+  MCtest(doit(7));
+
+  // -- change the function to print to 8
+  sprintf(buf, "\n"
+               "int _getnb(void) {\n"
+               "  return 414;\n"
+               "}\n");
+  MCtest(tcci_add_string(itp, "printings2.c", buf));
+
+  // -- invoke the address again
+  dbp("==================");
+  MCtest(doit(414));
+}
+
 void _test_struct_func_replace(TCCInterpState *itp)
 {
   char buf[2048];
@@ -398,6 +433,7 @@ void test_itp()
 
   itp->debug_verbose = 0;
   titp(_test_int_func_replace);
+  titp(_test_int_func_replace_mem_alloc);
   titp(_test_struct_func_replace);
   titp(_test_func_with_args_replace);
   titp(_test_variadic_func_replace);
