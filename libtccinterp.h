@@ -45,7 +45,7 @@ LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *ds, const char *symbol_nam
    NOTE: NOT YET PROPERLY IMPLEMENTED. It will also redirect internal interpreter calls if those calls
      were from seperate compilation units (ie. different calls to add_files,execute_single_use_code,add_string).
      Yes. Its quite icky. TODO */
-LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *ds, const char *symbol_name, void *addr);
+LIBTCCINTERPAPI void tcci_set_global_symbol(TCCInterpState *ds, const char *symbol_name, void *addr);
 
 /* TODO -- figure out naming and if I want to rid of tcci or just redirect with this
     -- I hope it doesn't have to wait till I figure out how to integrate tcc accumulative interpretation into tccs code

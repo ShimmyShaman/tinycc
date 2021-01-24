@@ -430,6 +430,7 @@ ST_FUNC int put_elf_sym(Section *s, addr_t value, unsigned long size, int info, 
   sym->st_other = other;
   sym->st_shndx = shndx;
   sym_index = sym - (ElfW(Sym) *)s->data;
+  
   // printf("put_elf_sym:>[%s] '%s''%s' %lu\n", s->name, (name == NULL ? "(null)" : name),
   //        (char *)s->link->data + sym->st_name, sym->st_value);
   hs = s->hash;

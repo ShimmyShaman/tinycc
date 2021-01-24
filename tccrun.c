@@ -455,17 +455,21 @@ typedef struct TCCIFuncRel {
 //   return 0;
 // }
 
-void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char binding, u_char type, void *addr)
+void tcci_set_interp_symbol(TCCInterpState *itp, const char *filename, const char *symbol_name, u_char binding,
+                            u_char type, void *addr)
 {
   TCCISymbol *sym = NULL;
-  long unsigned hash = hash_djb2(name);
+  long unsigned hash = hash_djb2(symbol_name);
+  if (binding == STB_LOCAL)
+    hash *= hash_djb2(filename);
+  printf("tcci_set_interp_symbol: '%s' bnd:%u type:%u\n", symbol_name, binding, type);
 
   // TODO -- just use the hash tables here???
   for (int a = 0; a < itp->nb_symbols; ++a) {
-    if (!strcmp(name, itp->symbols[a]->name)) {
+    if (!strcmp(symbol_name, itp->symbols[a]->name)) {
       sym = itp->symbols[a];
-      dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, addr));
-      // printf(">>>>> replacing old symbol for '%s' from %p > %p\n", name, (void *)sym->addr, addr);
+      dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr));
+      printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
 
       void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
       hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
@@ -475,10 +479,11 @@ void tcci_set_global_symbol(TCCInterpState *itp, const char *name, u_char bindin
   }
   if (!sym) {
     sym = tcc_mallocz(sizeof(TCCISymbol));
-    sym->name = tcc_strdup(name);
+    sym->name = tcc_strdup(symbol_name);
+    sym->filename = tcc_strdup(filename);
 
-    dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, addr));
-    // printf(">>>>> added new symbol for '%s':%lu @ %p\n", name, hash, addr);
+    dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr));
+    printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
     dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
 
     hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);
@@ -659,32 +664,21 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
   // Copy Info to itp from s1
   ElfW(Sym) * sym;
   Section *symtab = symtab_section;
+  u_char binding, type;
   for_each_elem(symtab, 1, sym, ElfW(Sym))
   {
-    u_char typeb = ELF64_ST_TYPE(sym->st_info);
-    if (typeb == STT_FUNC) {
-      printf("symtab:%p %i\n", symtab, sym->st_shndx);
-      printf("symtab->link:%p binding:%u\n", symtab->link, ELF64_ST_BIND(sym->st_info));
-      printf("sym->st_name:%s\n", (char *)symtab->link->data + sym->st_name);
-    }
-
-    u_char binding = ELF64_ST_BIND(sym->st_info);
-    if (binding != STB_GLOBAL)
-      continue;
-    u_char type = ELF64_ST_TYPE(sym->st_info);
+    // printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
+    //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
+    type = ELF64_ST_TYPE(sym->st_info);
     if (type != STT_FUNC || sym->st_shndx == 0)
       continue;
 
     if (s1->sections[sym->st_shndx] != text_section)
       continue;
 
-    // printf("<sym[%li]'%s'> \n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)),
-    //        (char *)symtab->link->data + sym->st_name);
-    // printf("binding:%u type:%u st_shndx:%u st_value:%p\n", binding, type, sym->st_shndx,
-    //        (void *)sym->st_value /*s1->sections[sym->st_shndx]->name,  */);
-
+    binding = ELF64_ST_BIND(sym->st_info);
     if (itp->in_single_use_state) {
-      if (itp->single_use.func_ptr) {
+      if (itp->single_use.func_ptr || binding != STB_GLOBAL) {
         // Only one should be set
         return 5;
       }
@@ -692,7 +686,26 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
       itp->single_use.func_ptr = (void *)sym->st_value;
     }
     else {
-      tcci_set_global_symbol(itp, (char *)symtab->link->data + sym->st_name, binding, type, (void *)sym->st_value);
+      // printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
+      //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
+
+      // Get the filename
+      printf("sym_index:%li nb_ind_sym_filenames:%i\n", sym - (ElfW(Sym) *)symtab->data, itp->nb_ind_sym_filenames);
+      const char *sym_fn = itp->ind_sym_filenames[sym - (ElfW(Sym) *)symtab->data];
+      printf("index?:%li file='%s'\n", sym - (ElfW(Sym) *)symtab->data, sym_fn);
+
+      // usleep(1000);
+      tcci_set_interp_symbol(itp, sym_fn, (char *)symtab->link->data + sym->st_name, binding, type,
+                             (void *)sym->st_value);
+
+      // if (binding != STB_GLOBAL)
+      //   continue;
+      // printf("<sym[%li]'%s'> \n", (int)((unsigned char *)sym - symtab->data) / sizeof(ElfW(Sym)),
+      //        (char *)symtab->link->data + sym->st_name);
+      // printf("binding:%u type:%u st_shndx:%u st_value:%p\n", binding, type, sym->st_shndx,
+      //        (void *)sym->st_value /*s1->sections[sym->st_shndx]->name,  */);
+
+      // tcci_set_global_symbol(itp, (char *)symtab->link->data + sym->st_name, binding, type, (void *)sym->st_value);
     }
   }
 

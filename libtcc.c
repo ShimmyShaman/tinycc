@@ -791,8 +791,8 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 
     itp->redir.get_by_hash_sym = NULL;
     for (int i = 0; i < itp->nb_symbols; ++i) {
+      printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
       if (!strcmp(fyf, itp->symbols[i]->name)) {
-        // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
         itp->redir.get_by_hash_sym = itp->symbols[i];
       }
     }
@@ -918,7 +918,7 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *itp)
 
 LIBTCCINTERPAPI void tcci_set_Werror(TCCInterpState *itp, unsigned char value) { itp->warn_error = value; }
 
-LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, const char *str)
+static int _tcci_pre_compile(TCCInterpState *itp)
 {
   int res;
 
@@ -929,7 +929,7 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
   // Initialize the output
   res = tcc_set_output_type(itp->s1, TCC_OUTPUT_MEMORY);
   if (res) {
-    puts("ERR[793]"); // TODO
+    puts("ERR[5424]"); // TODO
     return res;
   }
 
@@ -937,7 +937,7 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
   for (int a = 0; a < itp->nb_include_paths; ++a) {
     res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
     if (res) {
-      puts("ERR[793]"); // TODO
+      puts("ERR[6259]"); // TODO
       return res;
     }
   }
@@ -954,8 +954,34 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
 
   tcc_set_error_func(itp->s1, stderr, tcci_handle_error);
 
+  return 0;
+}
+
+static void _tcci_post_compile(TCCInterpState *itp)
+{
+  tcc_delete(itp->s1);
+  tcci_state = NULL;
+
+  if (itp->nb_ind_sym_filenames) {
+    for (int a = 0; a < itp->nb_ind_sym_filenames; ++a)
+      if (itp->ind_sym_filenames[a])
+        free(itp->ind_sym_filenames[a]);
+    free(itp->ind_sym_filenames);
+    itp->nb_ind_sym_filenames = 0;
+  }
+}
+
+LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, const char *str)
+{
+  int res;
+
+  res = _tcci_pre_compile(itp);
+  if (res)
+    return res;
+
   // if (!res) {
   itp->s1->string_filename = filename;
+  itp->s1->current_filename = filename;
   // itp->s1->filetype = 17;
   // printf("tcc_add_file, flags:%i\n", itp->s1->filetype);
   res = tcc_compile(itp->s1, itp->s1->filetype, str, -1);
@@ -966,8 +992,7 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
   }
   // }
 
-  tcc_delete(itp->s1);
-  tcci_state = NULL;
+  _tcci_post_compile(itp);
 
   return res;
 }
@@ -976,23 +1001,9 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsi
 {
   int res;
 
-  tcci_state = itp;
-  itp->s1 = tcc_new();
-  for (int a = 0; a < itp->nb_include_paths; ++a) {
-    res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
-    if (res) {
-      puts("ERR[793]"); // TODO
-      return res;
-    }
-  }
-  for (int a = 0; a < itp->nb_cmdline_def_pairs; a += 2) {
-    tcc_define_symbol(itp->s1, itp->cmdline_defs[a], itp->cmdline_defs[a + 1]);
-  }
-  for (int a = 0; a < itp->nb_libraries; ++a) {
-    tcc_add_library(itp->s1, itp->libraries[a]);
-  }
-  tcc_set_output_type(itp->s1, TCC_OUTPUT_MEMORY);
-  tcc_set_error_func(itp->s1, stderr, tcci_handle_error);
+  res = _tcci_pre_compile(itp);
+  if (res)
+    return res;
 
   for (unsigned a = 0; a < nb_files; ++a) {
     res = tcc_add_file(itp->s1, files[a]);
@@ -1008,8 +1019,7 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsi
   puts("...Relocating...");
   res = tcci_relocate_into_memory(itp);
 
-  tcc_delete(itp->s1);
-  tcci_state = NULL;
+  _tcci_post_compile(itp);
 
   return res;
 }
@@ -1154,11 +1164,11 @@ LIBTCCINTERPAPI void tcci_undefine_symbol(TCCInterpState *itp, const char *sym)
   }
 }
 
-LIBTCCINTERPAPI void tcci_set_symbol(TCCInterpState *itp, const char *symbol_name, void *addr)
+LIBTCCINTERPAPI void tcci_set_global_symbol(TCCInterpState *itp, const char *symbol_name, void *addr)
 {
   // tcc_load_object_file
   // TODO -- this method just redirects...
-  tcci_set_global_symbol(itp, symbol_name, STB_GLOBAL, STT_FUNC, addr);
+  tcci_set_interp_symbol(itp, "doesn't-matter", symbol_name, STB_GLOBAL, STT_FUNC, addr);
   // TCCISymbol *sym = NULL;
   // for (int i = 0; i < itp->nb_symbols; ++i) {
   //   if (!strcmp(symbol_name, itp->symbols[i]->name)) {

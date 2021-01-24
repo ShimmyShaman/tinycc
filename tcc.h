@@ -989,7 +989,7 @@ struct TCCState {
 };
 
 typedef struct TCCISymbol {
-  char *name;
+  char *name, *filename;
   u_char binding;
   u_char type;
   void *addr;
@@ -1033,6 +1033,9 @@ struct TCCInterpState {
     unsigned offset, allocated;
     uint8_t *ptr;
   } plt;
+
+  int nb_ind_sym_filenames;
+  char **ind_sym_filenames;
 
   struct {
     hash_table_t hash_to_addr, addr_to_addr;

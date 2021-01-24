@@ -922,8 +922,21 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num, addr_t value, unsigned long s
       name = buf1;
     }
 
+    // // const char *ident_name = get_tok_str(sym->type.t, NULL);
+    //  (char *)sym->type.t symtab->link->data + sym->st_name, ELF64_ST_BIND(sym->st_info), sym->st_shndx,
+    //  sym->st_other);
+
     info = ELFW(ST_INFO)(sym_bind, sym_type);
     sym->c = put_elf_sym(symtab_section, value, size, info, other, sh_num, name);
+    printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym->c:%i\n", name, t, tcc_state->current_filename, (void *)value,
+           sym->c);
+    if (tcci_state) {
+      for (int b = tcci_state->nb_ind_sym_filenames; b < sym->c; ++b)
+        dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames, NULL);
+      dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames,
+                   tcc_strdup(tcc_state->current_filename));
+    }
+    usleep(1000);
 
     if (tcc_state->do_debug && sym_type != STT_FUNC && sym->v < SYM_FIRST_ANOM)
       tcc_debug_extern_sym(tcc_state, sym, sh_num, sym_bind);
@@ -5678,17 +5691,16 @@ ST_FUNC void subst_itp_by_fname(int tok_ident)
 
   fsym = sym_find(tok_ident);
   const char *ident_name = get_tok_str(tok_ident, NULL);
-  if (fsym->type.t) {
-    
-    // tcc_state->current_filename
-    // then multiply by the hash below
-  }
   unsigned long fh = hash_djb2(ident_name);
 
   dba({
     puts("=========subst_itp_by_fname========");
     printf("vtop=[%li] name:%s(%lu)\n", vtop - vstack, ident_name, fh);
   });
+  // if (fsym->type.t & VT_STATIC) {
+  //   printf("static method '%s' multiplying hash by '%s'\n", ident_name, tcc_state->current_filename);
+  // fh *= hash_djb2(tcc_state->current_filename);
+  // }
 
   int ft = vtop->type.t;
   Sym *was = vtop->type.ref;
