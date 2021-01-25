@@ -523,17 +523,17 @@ void test_itp()
   tcci_add_files(itp, &va_list_fp, 1);
 
   itp->debug_verbose = 0;
-  // titp(_test_int_func_replace);
-  // titp(_test_int_func_replace_mem_alloc);
-  // titp(_test_struct_func_replace);
-  // titp(_test_func_with_args_replace);
-  // titp(_test_variadic_func_replace);
-  // titp(_test_func_ptr_replace);
-  // titp(_test_func_ptr_with_args_replace);
-  // titp(_test_struct_func_ptr_replace);
-  // titp(_test_variadic_func_ptr_replace);
+  titp(_test_int_func_replace);
+  titp(_test_int_func_replace_mem_alloc);
+  titp(_test_struct_func_replace);
+  titp(_test_func_with_args_replace);
+  titp(_test_variadic_func_replace);
+  titp(_test_func_ptr_replace);
+  titp(_test_func_ptr_with_args_replace);
+  titp(_test_struct_func_ptr_replace);
+  titp(_test_variadic_func_ptr_replace);
   // itp->debug_verbose = 1;
-  // titp(_test_static_func_replace);
+  titp(_test_static_func_replace);
   titp(_test_static_func_replace_from_files);
 
   itp->debug_verbose = 0;

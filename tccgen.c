@@ -928,15 +928,27 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num, addr_t value, unsigned long s
 
     info = ELFW(ST_INFO)(sym_bind, sym_type);
     sym->c = put_elf_sym(symtab_section, value, size, info, other, sh_num, name);
-    printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym->c:%i\n", name, t, tcc_state->current_filename, (void *)value,
-           sym->c);
+    // printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym->c:%i\n", name, t, tcc_state->current_filename, (void
+    // *)value,
+    //        sym->c);
     if (tcci_state) {
-      for (int b = tcci_state->nb_ind_sym_filenames; b < sym->c; ++b)
-        dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames, NULL);
-      dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames,
-                   tcc_strdup(tcc_state->current_filename));
+      const char *fn = tcc_strdup("this big word ookay dokaey");
+      if (tcc_state->current_filename)
+        hash_table_set_by_hash((unsigned long)sym->c, tcc_strdup(tcc_state->current_filename),
+                               &tcci_state->redir.sym_index_to_filename);
+      // printf("current_filename:'%s' nb_ind_sym_filenames:%i\n", tcc_state->current_filename,
+      //        tcci_state->nb_ind_sym_filenames);
+
+      // for (int b = tcci_state->nb_ind_sym_filenames; b < sym->c; ++b)
+      //   dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames, NULL);
+      // if (tcc_state->current_filename) {
+      //   dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames, (void *)fn);
+      // }
+      // else {
+      //   dynarray_add(&tcci_state->ind_sym_filenames, &tcci_state->nb_ind_sym_filenames, NULL);
+      // }
     }
-    usleep(1000);
+    // usleep(10000);
 
     if (tcc_state->do_debug && sym_type != STT_FUNC && sym->v < SYM_FIRST_ANOM)
       tcc_debug_extern_sym(tcc_state, sym, sh_num, sym_bind);
@@ -5697,10 +5709,10 @@ ST_FUNC void subst_itp_by_fname(int tok_ident)
     puts("=========subst_itp_by_fname========");
     printf("vtop=[%li] name:%s(%lu)\n", vtop - vstack, ident_name, fh);
   });
-  // if (fsym->type.t & VT_STATIC) {
-  //   printf("static method '%s' multiplying hash by '%s'\n", ident_name, tcc_state->current_filename);
-  // fh *= hash_djb2(tcc_state->current_filename);
-  // }
+  if (fsym->type.t & VT_STATIC) {
+    dba(printf("static method '%s' multiplying hash by '%s'\n", ident_name, tcc_state->current_filename));
+    fh *= hash_djb2(tcc_state->current_filename);
+  }
 
   int ft = vtop->type.t;
   Sym *was = vtop->type.ref;

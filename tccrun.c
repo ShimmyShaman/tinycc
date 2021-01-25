@@ -458,33 +458,30 @@ typedef struct TCCIFuncRel {
 void tcci_set_interp_symbol(TCCInterpState *itp, const char *filename, const char *symbol_name, u_char binding,
                             u_char type, void *addr)
 {
-  TCCISymbol *sym = NULL;
   long unsigned hash = hash_djb2(symbol_name);
-  if (binding == STB_LOCAL)
+  // printf("tcci_set_interp_symbol: '%s' bnd:%u type:%u '%s'\n", symbol_name, binding, type, filename);
+  if (binding == STB_LOCAL) {
     hash *= hash_djb2(filename);
-  printf("tcci_set_interp_symbol: '%s' bnd:%u type:%u\n", symbol_name, binding, type);
-
-  // TODO -- just use the hash tables here???
-  for (int a = 0; a < itp->nb_symbols; ++a) {
-    if (!strcmp(symbol_name, itp->symbols[a]->name)) {
-      sym = itp->symbols[a];
-      dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr));
-      printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
-
-      void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
-      hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
-      hash_table_set_by_hash((unsigned long)prev_addr, addr, &itp->redir.addr_to_addr);
-      break;
-    }
   }
-  if (!sym) {
+
+  TCCISymbol *sym = hash_table_get_by_hash(hash, &itp->symbols);
+
+  if (sym) {
+    dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr));
+    // printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
+
+    // void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
+    hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
+    hash_table_set_by_hash((unsigned long)sym->addr, addr, &itp->redir.addr_to_addr);
+  }
+  else {
     sym = tcc_mallocz(sizeof(TCCISymbol));
+    hash_table_insert(hash, sym, &itp->symbols);
     sym->name = tcc_strdup(symbol_name);
-    sym->filename = tcc_strdup(filename);
+    sym->filename = tcc_strdup(filename ? filename : "<unknown-file>");
 
     dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr));
-    printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
-    dynarray_add(&itp->symbols, &itp->nb_symbols, sym);
+    // printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
 
     hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);
   }
@@ -690,11 +687,14 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
       //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
 
       // Get the filename
-      printf("sym_index:%li nb_ind_sym_filenames:%i\n", sym - (ElfW(Sym) *)symtab->data, itp->nb_ind_sym_filenames);
-      const char *sym_fn = itp->ind_sym_filenames[sym - (ElfW(Sym) *)symtab->data];
-      printf("index?:%li file='%s'\n", sym - (ElfW(Sym) *)symtab->data, sym_fn);
+      // printf("sym_index:%li nb_ind_sym_filenames:%i\n", sym - (ElfW(Sym) *)symtab->data, itp->nb_ind_sym_filenames);
+      const char *sym_fn =
+          hash_table_get_by_hash((unsigned long)(sym - (ElfW(Sym) *)symtab->data), &itp->redir.sym_index_to_filename);
+      // printf("index?:%li file='%s'\n", sym - (ElfW(Sym) *)symtab->data, sym_fn);
+      if (!sym_fn) {
+        expect("sym_fn not NULL");
+      }
 
-      // usleep(1000);
       tcci_set_interp_symbol(itp, sym_fn, (char *)symtab->link->data + sym->st_name, binding, type,
                              (void *)sym->st_value);
 

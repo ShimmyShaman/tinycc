@@ -763,11 +763,13 @@ LIBTCCAPI int tcci_add_library(TCCInterpState *itp, const char *libname)
 LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
   TCCInterpState *itp = tcc_mallocz(sizeof(TCCInterpState));
+  init_hash_table(512, &itp->symbols);
 
   itp->debug_verbose = 0;
 
   char fyf[32], buf[512];
   itp->redir.do_subst = 0;
+  init_hash_table(256, &itp->redir.sym_index_to_filename);
   {
     // Hash-To-Addr
     // TODO -- add a param for expected function declarations &/ redefinitions?
@@ -789,13 +791,7 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
     // puts(buf);
     tcci_add_string(itp, "_tcci_init_a.gen", buf);
 
-    itp->redir.get_by_hash_sym = NULL;
-    for (int i = 0; i < itp->nb_symbols; ++i) {
-      printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
-      if (!strcmp(fyf, itp->symbols[i]->name)) {
-        itp->redir.get_by_hash_sym = itp->symbols[i];
-      }
-    }
+    itp->redir.get_by_hash_sym = hash_table_get(fyf, &itp->symbols);
     if (!itp->redir.get_by_hash_sym)
       expect("itp->redir.get_by_hash_sym not NULL");
     // itp->redir.get_by_hash_fptr = (void *)tcci_get_symbol(itp, fyf);
@@ -822,13 +818,7 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
     // puts(buf);
     tcci_add_string(itp, "_tcci_init_b.gen", buf);
 
-    itp->redir.get_by_addr_sym = NULL;
-    for (int i = 0; i < itp->nb_symbols; ++i) {
-      if (!strcmp(fyf, itp->symbols[i]->name)) {
-        // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n", fyf, itp->symbols[i]->name);
-        itp->redir.get_by_addr_sym = itp->symbols[i];
-      }
-    }
+    itp->redir.get_by_addr_sym = hash_table_get(fyf, &itp->symbols);
     if (!itp->redir.get_by_addr_sym)
       expect("itp->redir.get_by_addr_sym not NULL");
   }
@@ -857,10 +847,11 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 /* free a TCC interpretation context */
 LIBTCCINTERPAPI void tcci_delete(TCCInterpState *itp)
 {
+  int a;
 #if 1
   {
     // Verbose
-    printf("deleting tccinterp state [%i symbols, ", itp->nb_symbols);
+    printf("deleting tccinterp state [%li symbols, ", itp->symbols.n);
 
     double rms = (double)itp->runtime_mem_size;
     const char *scale;
@@ -880,34 +871,49 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *itp)
 #endif
 
   // tcc_delete(itp->s1);
-  for (int a = 0; a < itp->nb_runtime_mem_blocks; ++a) {
+  for (a = 0; a < itp->nb_runtime_mem_blocks; ++a) {
     free(itp->runtime_mem_blocks[a]);
   }
   free(itp->runtime_mem_blocks);
 
-  for (int a = 0; a < itp->nb_symbols; ++a) {
-    TCCISymbol *sym = itp->symbols[a];
-    free(sym->name);
+  hash_table_entry_t *ent;
+  for (ent = itp->symbols.entries; ent < itp->symbols.entries + itp->symbols.capacity; ++ent) {
+    if (!ent->filled)
+      continue;
+
+    TCCISymbol *sym = (TCCISymbol *)ent->value;
+    if (sym->filename)
+      free(sym->filename);
+    if (sym->name)
+      free(sym->name);
+    if (sym->nb_got_users)
+      free(sym->got_users);
     free(sym);
+
+    ent->filled = 0;
   }
-  free(itp->symbols);
+  destroy_hash_table(&itp->symbols);
+
+  destroy_hash_table(&itp->redir.sym_index_to_filename);
+  destroy_hash_table(&itp->redir.addr_to_addr);
+  destroy_hash_table(&itp->redir.hash_to_addr);
 
   if (itp->nb_cmdline_def_pairs) {
-    for (int a = 0; a < itp->nb_cmdline_def_pairs; ++a) {
+    for (a = 0; a < itp->nb_cmdline_def_pairs; ++a) {
       free(itp->cmdline_defs[a]);
     }
     free(itp->cmdline_defs);
   }
 
   if (itp->nb_include_paths) {
-    for (int a = 0; a < itp->nb_include_paths; ++a) {
+    for (a = 0; a < itp->nb_include_paths; ++a) {
       free(itp->include_paths[a]);
     }
     free(itp->include_paths);
   }
 
   if (itp->nb_libraries) {
-    for (int a = 0; a < itp->nb_libraries; ++a) {
+    for (a = 0; a < itp->nb_libraries; ++a) {
       free(itp->libraries[a]);
     }
     free(itp->libraries);
@@ -962,13 +968,7 @@ static void _tcci_post_compile(TCCInterpState *itp)
   tcc_delete(itp->s1);
   tcci_state = NULL;
 
-  if (itp->nb_ind_sym_filenames) {
-    for (int a = 0; a < itp->nb_ind_sym_filenames; ++a)
-      if (itp->ind_sym_filenames[a])
-        free(itp->ind_sym_filenames[a]);
-    free(itp->ind_sym_filenames);
-    itp->nb_ind_sym_filenames = 0;
-  }
+  hash_table_clear(&itp->redir.sym_index_to_filename);
 }
 
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, const char *str)
@@ -985,6 +985,7 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
   // itp->s1->filetype = 17;
   // printf("tcc_add_file, flags:%i\n", itp->s1->filetype);
   res = tcc_compile(itp->s1, itp->s1->filetype, str, -1);
+  // printf("compile res=%i\n", res);
 
   if (!res) {
     // puts("...Relocating...");
@@ -1016,7 +1017,7 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsi
     // tcc_compile(itp->s1, AFF_PRINT_ERROR | AFF_TYPE_C, files[a], 0);
   }
 
-  puts("...Relocating...");
+  // puts("...Relocating...");
   res = tcci_relocate_into_memory(itp);
 
   _tcci_post_compile(itp);
@@ -1126,12 +1127,10 @@ includes_complete:
 
 LIBTCCINTERPAPI void *tcci_get_symbol(TCCInterpState *itp, const char *symbol_name)
 {
-  for (int i = 0; i < itp->nb_symbols; ++i) {
-    // printf("symbol_name='%s', itp->symbols[i]->name='%s'\n",symbol_name, itp->symbols[i]->name);
-    if (!strcmp(symbol_name, itp->symbols[i]->name)) {
-      return (void *)itp->symbols[i]->addr;
-    }
-  }
+  TCCISymbol *sym = hash_table_get(symbol_name, &itp->symbols);
+  if (sym)
+    return sym->addr;
+
   return NULL;
 }
 
@@ -1168,7 +1167,7 @@ LIBTCCINTERPAPI void tcci_set_global_symbol(TCCInterpState *itp, const char *sym
 {
   // tcc_load_object_file
   // TODO -- this method just redirects...
-  tcci_set_interp_symbol(itp, "doesn't-matter", symbol_name, STB_GLOBAL, STT_FUNC, addr);
+  tcci_set_interp_symbol(itp, "doesn't-matter-while-binding-is-STB_GLOBAL", symbol_name, STB_GLOBAL, STT_FUNC, addr);
   // TCCISymbol *sym = NULL;
   // for (int i = 0; i < itp->nb_symbols; ++i) {
   //   if (!strcmp(symbol_name, itp->symbols[i]->name)) {

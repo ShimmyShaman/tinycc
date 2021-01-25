@@ -1007,8 +1007,7 @@ struct TCCInterpState {
   void **runtime_mem_blocks; /* pointer to execution text blocks */
   int nb_runtime_mem_blocks; /* number thereof */
   uint64_t runtime_mem_size;
-  struct TCCISymbol **symbols; /* pointer to execution text blocks */
-  int nb_symbols;              /* number thereof */
+  hash_table_t symbols; /* hashed by function-name (* filename for static functions) */
 
   int nb_cmdline_def_pairs;
   char **cmdline_defs;
@@ -1034,10 +1033,8 @@ struct TCCInterpState {
     uint8_t *ptr;
   } plt;
 
-  int nb_ind_sym_filenames;
-  char **ind_sym_filenames;
-
   struct {
+    hash_table_t sym_index_to_filename;
     hash_table_t hash_to_addr, addr_to_addr;
     TCCISymbol *get_by_hash_sym, *get_by_addr_sym;
     int do_subst;

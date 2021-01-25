@@ -430,7 +430,7 @@ ST_FUNC int put_elf_sym(Section *s, addr_t value, unsigned long size, int info, 
   sym->st_other = other;
   sym->st_shndx = shndx;
   sym_index = sym - (ElfW(Sym) *)s->data;
-  
+
   // printf("put_elf_sym:>[%s] '%s''%s' %lu\n", s->name, (name == NULL ? "(null)" : name),
   //        (char *)s->link->data + sym->st_name, sym->st_value);
   hs = s->hash;
@@ -1019,46 +1019,47 @@ ST_FUNC void tcci_relocate_syms(TCCInterpState *ds, Section *symtab, int do_reso
             goto found;
 
           // Resolve with other interpretive sessions
-          for (int a = 0; a < ds->nb_symbols; ++a) {
-            if (!strcmp(ds->symbols[a]->name, name)) {
-              // printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
-              sym->st_value = (Elf64_Addr)ds->symbols[a]->addr;
-              // printf("interp_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
+          unsigned long hash = hash_djb2(name);
+          TCCISymbol *itp_sym = hash_table_get_by_hash(hash, &tcci_state->symbols);
 
-              // Find the GOT global addr
-              // s1->got->reloc
-              // TODO performance improvements
+          if (itp_sym) {
+            // printf("interp_symbol_info] st_shndx:%u st_value(before):%p \n", sym->st_shndx, (void *)sym->st_value);
+            sym->st_value = (Elf64_Addr)itp_sym->addr;
+            // printf("interp_symbol_resolved: '%s' -> 0x%lx\n", name, sym->st_value);
 
-              if (ds->in_single_use_state)
-                continue;
+            // Find the GOT global addr
+            // s1->got->reloc
+            // TODO performance improvements
 
-              // Register usage of the global symbol (to allow for redirection for the case of redefinition)
-              ElfW_Rel *rel;
-              for_each_elem(s1->got->reloc, 0, rel, ElfW_Rel)
-              {
-                int rel_sym_index = ELFW(R_SYM)(rel->r_info);
-                ElfW(Sym) * rel_sym;
-                rel_sym = &((ElfW(Sym) *)symtab_section->data)[rel_sym_index];
+            if (ds->in_single_use_state)
+              continue;
 
-                if (!strcmp(name, (char *)symtab_section->link->data + rel_sym->st_name)) {
-                  void *tgt = (void *)((u_char *)s1->got->sh_addr + rel->r_offset);
-                  // printf("GOT: sec:%s sym:%s shndx:%u index:%i addr:%p rel_offset:%p\n", s1->got->reloc->name,
-                  //        (char *)symtab_section->link->data + rel_sym->st_name, rel_sym->st_shndx, got_reloc_index,
-                  //        tgt, rel->r_offset);
+            // Register usage of the global symbol (to allow for redirection for the case of redefinition)
+            ElfW_Rel *rel;
+            for_each_elem(s1->got->reloc, 0, rel, ElfW_Rel)
+            {
+              int rel_sym_index = ELFW(R_SYM)(rel->r_info);
+              ElfW(Sym) * rel_sym;
+              rel_sym = &((ElfW(Sym) *)symtab_section->data)[rel_sym_index];
 
-                  // TODO -- Do not allow redefinition of a function (IF it redefines the parameter signature) without
-                  // delivering a warning NO further checking will be done or ensured - It will be assumed the user
-                  // knows of all function calls and has fixed them prior
+              if (!strcmp(name, (char *)symtab_section->link->data + rel_sym->st_name)) {
+                void *tgt = (void *)((u_char *)s1->got->sh_addr + rel->r_offset);
+                // printf("GOT: sec:%s sym:%s shndx:%u index:%i addr:%p rel_offset:%p\n", s1->got->reloc->name,
+                //        (char *)symtab_section->link->data + rel_sym->st_name, rel_sym->st_shndx, got_reloc_index,
+                //        tgt, rel->r_offset);
 
-                  // printf("added user to symbol '%s'\n", ds->symbols[a]->name);
+                // TODO -- Do not allow redefinition of a function (IF it redefines the parameter signature) without
+                // delivering a warning NO further checking will be done or ensured - It will be assumed the user
+                // knows of all function calls and has fixed them prior
 
-                  // TODO -- make this collection a hash-set
-                  dynarray_add(&ds->symbols[a]->got_users, &ds->symbols[a]->nb_got_users, tgt);
-                  goto found;
-                }
+                // printf("added user to symbol '%s'\n", itp_sym->name);
+
+                // TODO -- make this collection a hash-set
+                dynarray_add(&itp_sym->got_users, &itp_sym->nb_got_users, tgt);
+                goto found;
               }
-              tcc_error_noabort("could not find got-entry for usage of symbol '%s'", name);
             }
+            tcc_error_noabort("could not find got-entry for usage of symbol '%s'", name);
           }
         }
 #endif
@@ -1370,7 +1371,8 @@ ST_FUNC void build_got_entries(TCCState *s1)
       sym_index = ELFW(R_SYM)(rel->r_info);
       sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
 
-      // printf("GOT: sec:%s sym:%s shndx:%u reltype:%i\n", s->name, (char *)symtab_section->link->data + sym->st_name,
+      // printf("GOT: sec:%s sym:%s shndx:%u reltype:%i\n", s->name, (char *)symtab_section->link->data +
+      // sym->st_name,
       //        sym->st_shndx, type);
 
       if (gotplt_entry == NO_GOTPLT_ENTRY) {
