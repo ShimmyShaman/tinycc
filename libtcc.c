@@ -769,7 +769,7 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 
   char fyf[32], buf[512];
   itp->redir.do_subst = 0;
-  init_hash_table(256, &itp->redir.sym_index_to_filename);
+  init_hash_table(32, &itp->redir.sym_index_to_filename);
   {
     // Hash-To-Addr
     // TODO -- add a param for expected function declarations &/ redefinitions?
@@ -969,6 +969,17 @@ static void _tcci_post_compile(TCCInterpState *itp)
   tcci_state = NULL;
 
   hash_table_clear(&itp->redir.sym_index_to_filename);
+  hash_table_entry_t *ent;
+  for (ent = itp->redir.sym_index_to_filename.entries;
+       ent < itp->redir.sym_index_to_filename.entries + itp->redir.sym_index_to_filename.capacity; ++ent) {
+    if (!ent->filled)
+      continue;
+
+    if (ent->value)
+      free(ent->value);
+
+    ent->filled = 0;
+  }
 }
 
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, const char *str)
@@ -983,12 +994,12 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, c
   itp->s1->string_filename = filename;
   itp->s1->current_filename = filename;
   // itp->s1->filetype = 17;
-  // printf("tcc_add_file, flags:%i\n", itp->s1->filetype);
+  dba(printf("tcc_add_file:'%s', flags:%i\n", filename, itp->s1->filetype));
   res = tcc_compile(itp->s1, itp->s1->filetype, str, -1);
   // printf("compile res=%i\n", res);
 
   if (!res) {
-    // puts("...Relocating...");
+    dba(puts("...Relocating..."));
     res = tcci_relocate_into_memory(itp);
   }
   // }

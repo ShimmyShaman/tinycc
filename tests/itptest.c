@@ -504,6 +504,30 @@ void _test_static_func_replace_from_files(TCCInterpState *itp)
   MCtest(checkit1(98));
 }
 
+int getnb44(void) { return 44; }
+
+void _test_use_set_global_symbol(TCCInterpState *itp)
+{
+  tcci_set_global_symbol(itp, "_getxtnb", &getnb44);
+
+  char buf[2048];
+  sprintf(buf, "#include <stdio.h>\n"
+               "\n"
+               "extern int _getxtnb(void);\n"
+               "\n"
+               "int doit(int expect) {\n"
+               "  int a = _getxtnb();\n"
+               "  return a - expect;\n"
+               "}\n");
+  MCtest(tcci_add_string(itp, "testies.c", buf));
+
+  dbp("####### Invoking doit() #######");
+
+  // -- invoke the address
+  int (*doit)(int) = (int (*)(int))tcci_get_symbol(itp, "doit");
+  MCtest(doit(44));
+}
+
 #define titp(tfunc)                 \
   if (!itp->debug_verbose)          \
     printf("test '%s'...", #tfunc); \
@@ -523,18 +547,19 @@ void test_itp()
   tcci_add_files(itp, &va_list_fp, 1);
 
   itp->debug_verbose = 0;
-  titp(_test_int_func_replace);
-  titp(_test_int_func_replace_mem_alloc);
-  titp(_test_struct_func_replace);
-  titp(_test_func_with_args_replace);
-  titp(_test_variadic_func_replace);
-  titp(_test_func_ptr_replace);
-  titp(_test_func_ptr_with_args_replace);
-  titp(_test_struct_func_ptr_replace);
-  titp(_test_variadic_func_ptr_replace);
-  // itp->debug_verbose = 1;
-  titp(_test_static_func_replace);
-  titp(_test_static_func_replace_from_files);
+  // titp(_test_int_func_replace);
+  // titp(_test_int_func_replace_mem_alloc);
+  // titp(_test_struct_func_replace);
+  // titp(_test_func_with_args_replace);
+  // titp(_test_variadic_func_replace);
+  // titp(_test_func_ptr_replace);
+  // titp(_test_func_ptr_with_args_replace);
+  // titp(_test_struct_func_ptr_replace);
+  // titp(_test_variadic_func_ptr_replace);
+  // // itp->debug_verbose = 1;
+  // titp(_test_static_func_replace);
+  // titp(_test_static_func_replace_from_files);
+  titp(_test_use_set_global_symbol);
 
   itp->debug_verbose = 0;
   exit(0);

@@ -186,9 +186,11 @@ void hash_table_set(const char *name, void *val, hash_table_t *hash_table)
    * Grow until the element has been added
    */
   long ht_insert;
+  size_t nex = hash_table->n + 1;
   do {
-    hash_table_maybe_grow(hash_table->n + 1, hash_table);
+    hash_table_maybe_grow(nex, hash_table);
     ht_insert = hash_table_insert(hash, val, hash_table);
+    ++nex;
   } while (ht_insert != HASH_TABLE_SUCCESS);
 }
 
@@ -204,9 +206,17 @@ void hash_table_set_by_hash(unsigned long hash, void *val, hash_table_t *hash_ta
    * Grow until the element has been added
    */
   long ht_insert;
+  size_t nex = hash_table->n + 1;
   do {
-    hash_table_maybe_grow(hash_table->n + 1, hash_table);
+    // printf("n:%li cap:%li\n", hash_table->n, hash_table->capacity);
+    hash_table_maybe_grow(nex, hash_table);
+    // printf("n:%li cap:%li\n", hash_table->n, hash_table->capacity);
+    // usleep(10000);
     ht_insert = hash_table_insert(hash, val, hash_table);
+    ++nex;
+    // if (ht_insert != HASH_TABLE_SUCCESS)
+    //   exit(88);
+    return;
   } while (ht_insert != HASH_TABLE_SUCCESS);
 }
 

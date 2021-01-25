@@ -928,14 +928,19 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num, addr_t value, unsigned long s
 
     info = ELFW(ST_INFO)(sym_bind, sym_type);
     sym->c = put_elf_sym(symtab_section, value, size, info, other, sh_num, name);
-    // printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym->c:%i\n", name, t, tcc_state->current_filename, (void
-    // *)value,
-    //        sym->c);
     if (tcci_state) {
-      const char *fn = tcc_strdup("this big word ookay dokaey");
-      if (tcc_state->current_filename)
+      // const char *fn = tcc_strdup("this big word ookay dokaey");
+      if (tcc_state->current_filename) {
+        printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym->c:%i\n", name, t, tcc_state->current_filename,
+               (void *)value, sym->c);
+               usleep(1000);
+        // printf("tcci_state->redir.sym_index_to_filename:%i\n", tcci_state->redir.sym_index_to_filename.capacity);
+        // TODO How many times are you copying this string per file ??? LOTS TOO MANY WAY TOO MUCH
         hash_table_set_by_hash((unsigned long)sym->c, tcc_strdup(tcc_state->current_filename),
                                &tcci_state->redir.sym_index_to_filename);
+        // printf("type:%i sym_scope:%i\n", sym->type.t, sym->f);
+        // puts("b");
+      }
       // printf("current_filename:'%s' nb_ind_sym_filenames:%i\n", tcc_state->current_filename,
       //        tcci_state->nb_ind_sym_filenames);
 

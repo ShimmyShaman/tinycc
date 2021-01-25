@@ -468,7 +468,7 @@ void tcci_set_interp_symbol(TCCInterpState *itp, const char *filename, const cha
 
   if (sym) {
     dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr));
-    // printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
+    printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
 
     // void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
     hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
@@ -476,14 +476,14 @@ void tcci_set_interp_symbol(TCCInterpState *itp, const char *filename, const cha
   }
   else {
     sym = tcc_mallocz(sizeof(TCCISymbol));
-    hash_table_insert(hash, sym, &itp->symbols);
+    hash_table_set_by_hash(hash, sym, &itp->symbols);
     sym->name = tcc_strdup(symbol_name);
     sym->filename = tcc_strdup(filename ? filename : "<unknown-file>");
 
     dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr));
-    // printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
+    printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
 
-    hash_table_insert(hash, (void *)addr, &itp->redir.hash_to_addr);
+    hash_table_set_by_hash(hash, (void *)addr, &itp->redir.hash_to_addr);
   }
 
   // Set Properties
@@ -683,14 +683,14 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
       itp->single_use.func_ptr = (void *)sym->st_value;
     }
     else {
-      // printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
-      //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
+      printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
+             ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
 
       // Get the filename
       // printf("sym_index:%li nb_ind_sym_filenames:%i\n", sym - (ElfW(Sym) *)symtab->data, itp->nb_ind_sym_filenames);
       const char *sym_fn =
           hash_table_get_by_hash((unsigned long)(sym - (ElfW(Sym) *)symtab->data), &itp->redir.sym_index_to_filename);
-      // printf("index?:%li file='%s'\n", sym - (ElfW(Sym) *)symtab->data, sym_fn);
+      printf("index?:%li file='%s'\n", sym - (ElfW(Sym) *)symtab->data, sym_fn);
       if (!sym_fn) {
         expect("sym_fn not NULL");
       }
