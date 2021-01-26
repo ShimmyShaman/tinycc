@@ -889,8 +889,6 @@ LIBTCCINTERPAPI void tcci_delete(TCCInterpState *itp)
     if (sym->nb_got_users)
       free(sym->got_users);
     free(sym);
-
-    ent->filled = 0;
   }
   destroy_hash_table(&itp->symbols);
 
@@ -968,18 +966,18 @@ static void _tcci_post_compile(TCCInterpState *itp)
   tcc_delete(itp->s1);
   tcci_state = NULL;
 
+  // hash_table_entry_t *ent;
+  // for (ent = itp->redir.sym_index_to_filename.entries;
+  //      ent < itp->redir.sym_index_to_filename.entries + itp->redir.sym_index_to_filename.capacity; ++ent) {
+  //   if (!ent->filled)
+  //     continue;
+
+  //   if (ent->value)
+  //     free(ent->value);
+
+  //   ent->filled = 0;
+  // }
   hash_table_clear(&itp->redir.sym_index_to_filename);
-  hash_table_entry_t *ent;
-  for (ent = itp->redir.sym_index_to_filename.entries;
-       ent < itp->redir.sym_index_to_filename.entries + itp->redir.sym_index_to_filename.capacity; ++ent) {
-    if (!ent->filled)
-      continue;
-
-    if (ent->value)
-      free(ent->value);
-
-    ent->filled = 0;
-  }
 }
 
 LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *itp, const char *filename, const char *str)

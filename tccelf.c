@@ -165,6 +165,7 @@ ST_FUNC void tccelf_end_file(TCCState *s1)
 {
   Section *s = s1->symtab;
   int first_sym, nb_syms, *tr, i;
+  void *fn;
 
   first_sym = s->sh_offset / sizeof(ElfSym);
   nb_syms = s->data_offset / sizeof(ElfSym) - first_sym;
@@ -173,15 +174,30 @@ ST_FUNC void tccelf_end_file(TCCState *s1)
   s->hash = s->reloc, s->reloc = NULL;
   tr = tcc_mallocz(nb_syms * sizeof *tr);
 
-  // printf("nb_syms:%i, first_sym:%i\n", nb_syms,first_sym);
+  // printf("nb_syms:%i, first_sym:%i\n", nb_syms, first_sym);
   for (i = 0; i < nb_syms; ++i) {
     ElfSym *sym = (ElfSym *)s->data + first_sym + i;
-    // printf("-sym:'%s' st_info:%u st_shndx:%i\n", (char*)s->link->data + sym->st_name, sym->st_info, sym->st_shndx);
+    printf("-sym:'%s' st_info:%u st_shndx:%i", (char *)s->link->data + sym->st_name, sym->st_info, sym->st_shndx);
     if (sym->st_shndx == SHN_UNDEF && ELFW(ST_BIND)(sym->st_info) == STB_LOCAL)
       sym->st_info = ELFW(ST_INFO)(STB_GLOBAL, ELFW(ST_TYPE)(sym->st_info));
     tr[i] = set_elf_sym(s, sym->st_value, sym->st_size, sym->st_info, sym->st_other, sym->st_shndx,
                         (char *)s->link->data + sym->st_name);
+
+    if (first_sym + i != tr[i] && tcci_state && tcci_state->redir.do_subst) {
+      // TCCI sym index to filename adjustment
+      fn = hash_table_get_by_hash((unsigned long)(first_sym + i), &tcci_state->redir.sym_index_to_filename);
+
+      printf("> elf-end-file : %i:'%s' >> %i", first_sym + i, (const char *)fn, tr[i]);
+
+      if (fn) {
+        hash_table_remove((unsigned long)(first_sym + i), &tcci_state->redir.sym_index_to_filename);
+        hash_table_set_by_hash((unsigned long)tr[i], fn, &tcci_state->redir.sym_index_to_filename);
+      }
+    }
+    printf("\n");
+    usleep(1000);
   }
+
   /* now update relocations */
   for (i = 1; i < s1->nb_sections; i++) {
     Section *sr = s1->sections[i];

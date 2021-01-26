@@ -105,8 +105,10 @@ int hash_table_remove(unsigned long hash, hash_table_t *hash_table)
     break;
   }
 
+  printf(" -- hash_table_remove %lu", entry->hash);
   if (entry == start_entry) {
     if (entry->next) {
+      printf(", entnext->stent:%lu ", entry->next->hash);
       memcpy(start_entry, entry->next, sizeof(hash_table_entry_t));
       memset(entry->next, 0, sizeof(hash_table_entry_t));
     }
@@ -116,9 +118,17 @@ int hash_table_remove(unsigned long hash, hash_table_t *hash_table)
   }
   else {
     if (entry->next) {
+      printf(", prev:%lu ->next:%lu ", prev_entry->next->hash, entry->next->hash);
       prev_entry->next = entry->next;
     }
     memset(entry, 0, sizeof(hash_table_entry_t));
+  }
+
+  for (int a = 0; a < hash_table->n; ++a) {
+    if (hash_table->hashes[a] == hash) {
+      hash_table->hashes[a] = hash_table->hashes[hash_table->n - 1];
+      break;
+    }
   }
 
   --hash_table->n;
