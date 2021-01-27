@@ -105,10 +105,10 @@ int hash_table_remove(unsigned long hash, hash_table_t *hash_table)
     break;
   }
 
-  printf(" -- hash_table_remove %lu", entry->hash);
+  // printf(" -- hash_table_remove %lu", entry->hash);
   if (entry == start_entry) {
     if (entry->next) {
-      printf(", entnext->stent:%lu ", entry->next->hash);
+      // printf(", entnext->stent:%lu ", entry->next->hash);
       memcpy(start_entry, entry->next, sizeof(hash_table_entry_t));
       memset(entry->next, 0, sizeof(hash_table_entry_t));
     }
@@ -118,7 +118,7 @@ int hash_table_remove(unsigned long hash, hash_table_t *hash_table)
   }
   else {
     if (entry->next) {
-      printf(", prev:%lu ->next:%lu ", prev_entry->next->hash, entry->next->hash);
+      // printf(", prev:%lu ->next:%lu ", prev_entry->next->hash, entry->next->hash);
       prev_entry->next = entry->next;
     }
     memset(entry, 0, sizeof(hash_table_entry_t));
@@ -157,6 +157,8 @@ void hash_table_maybe_grow(size_t new_n, hash_table_t *hash_table)
     return;
   }
   new_capacity = 2 * ((2 * hash_table->capacity) > new_n ? hash_table->capacity : new_n);
+  // printf("hash_table_maybe_grow capacity %li => %li (for %li items)\n", hash_table->capacity, new_capacity,
+  //        hash_table->n + 1);
   /* Create a new hash table. We're not calling init_hash_table because we want to realloc the hash array */
   new_hash_table.hashes = hash_table->hashes =
       (unsigned long *)realloc((void *)hash_table->hashes, sizeof(unsigned long) * new_capacity);
@@ -165,8 +167,10 @@ void hash_table_maybe_grow(size_t new_n, hash_table_t *hash_table)
   new_hash_table.n = hash_table->n;
 
   /* Rehash */
-  for (i = 0; i < hash_table->capacity; i++) {
+  for (i = 0; i < hash_table->n; i++) {
     hash_table_entry_t *entry = hash_table_find(hash_table->hashes[i], hash_table);
+    if (!entry)
+      printf("couldn't find %li:%lu\n", i, hash_table->hashes[i]);
     hash_table_change_value(hash_table->hashes[i], entry->value, &new_hash_table);
   }
 
@@ -196,8 +200,11 @@ void hash_table_set(const char *name, void *val, hash_table_t *hash_table)
    * Grow until the element has been added
    */
   long ht_insert;
-  size_t nex = hash_table->n + 1;
+  size_t nex = hash_table->n;
+  size_t inc = 1;
   do {
+    nex += inc;
+    ++inc;
     hash_table_maybe_grow(nex, hash_table);
     ht_insert = hash_table_insert(hash, val, hash_table);
     ++nex;
@@ -216,17 +223,19 @@ void hash_table_set_by_hash(unsigned long hash, void *val, hash_table_t *hash_ta
    * Grow until the element has been added
    */
   long ht_insert;
-  size_t nex = hash_table->n + 1;
+  size_t nex = hash_table->n;
+  size_t inc = 1;
   do {
-    // printf("n:%li cap:%li\n", hash_table->n, hash_table->capacity);
+    nex += inc;
+    ++inc;
+    // printf("nex:%li n:%li cap:%li\n", nex, hash_table->n, hash_table->capacity);
     hash_table_maybe_grow(nex, hash_table);
     // printf("n:%li cap:%li\n", hash_table->n, hash_table->capacity);
     // usleep(10000);
     ht_insert = hash_table_insert(hash, val, hash_table);
-    ++nex;
     // if (ht_insert != HASH_TABLE_SUCCESS)
     //   exit(88);
-    return;
+    // return;
   } while (ht_insert != HASH_TABLE_SUCCESS);
 }
 

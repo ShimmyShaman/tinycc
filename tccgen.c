@@ -931,19 +931,19 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num, addr_t value, unsigned long s
     if (tcci_state) {
       // const char *fn = tcc_strdup("this big word ookay dokaey");
       if (tcc_state->current_filename) {
-        printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym:%i\n", name, t, tcc_state->current_filename,
-               (void *)value, sym->c);
-        usleep(1000);
+        // printf("put_extern_sym2 sym->name:'%s' %i '%s' %p sym:%i\n", name, t, tcc_state->current_filename,
+        //        (void *)value, sym->c);
+        // usleep(1000);
 
         // printf("tcci_state->redir.sym_index_to_filename:%i\n", tcci_state->redir.sym_index_to_filename.capacity);
         // TODO How many times are you copying this string per file ??? LOTS TOO MANY WAY TOO MUCH
         hash_table_set_by_hash((unsigned long)sym->c, tcc_strdup(tcc_state->current_filename),
                                &tcci_state->redir.sym_index_to_filename);
 
-        if (sym->c == 69) {
-          printf(">twas 69: '%s'\n", (const char *)hash_table_get_by_hash(69LU, &tcci_state->redir.sym_index_to_filename));
-          usleep(1000);
-        }
+        // if (sym->c == 69) {
+        //   printf(">twas 69: '%s'\n", (const char *)hash_table_get_by_hash(69LU, &tcci_state->redir.sym_index_to_filename));
+        //   usleep(1000);
+        // }
         // printf("type:%i sym_scope:%i\n", sym->type.t, sym->f);
         // puts("b");
       }

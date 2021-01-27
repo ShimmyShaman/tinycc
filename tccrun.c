@@ -468,7 +468,7 @@ void tcci_set_interp_symbol(TCCInterpState *itp, const char *filename, const cha
 
   if (sym) {
     dba(printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr));
-    printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
+    // printf(">>>>> replacing old symbol for '%s' from %p > %p\n", symbol_name, (void *)sym->addr, addr);
 
     // void *prev_addr = hash_table_get_by_hash(hash, &itp->redir.hash_to_addr);
     hash_table_set_by_hash(hash, addr, &itp->redir.hash_to_addr);
@@ -481,7 +481,7 @@ void tcci_set_interp_symbol(TCCInterpState *itp, const char *filename, const cha
     sym->filename = tcc_strdup(filename ? filename : "<unknown-file>");
 
     dba(printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr));
-    printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
+    // printf(">>>>> added new symbol for '%s':%lu @ %p\n", symbol_name, hash, addr);
 
     hash_table_set_by_hash(hash, (void *)addr, &itp->redir.hash_to_addr);
   }
@@ -664,8 +664,8 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
   u_char binding, type;
   for_each_elem(symtab, 1, sym, ElfW(Sym))
   {
-    if (!strcmp((char *)symtab->link->data + sym->st_name, "register_midge_error_tag"))
-      printf("!> register_midge_error_tag was found at index %li\n", sym - (ElfW(Sym) *)symtab->data);
+    // if (!strcmp((char *)symtab->link->data + sym->st_name, "register_midge_error_tag"))
+    //   printf("!> register_midge_error_tag was found at index %li\n", sym - (ElfW(Sym) *)symtab->data);
     // printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
     //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
     type = ELF64_ST_TYPE(sym->st_info);
@@ -685,14 +685,14 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
       itp->single_use.func_ptr = (void *)sym->st_value;
     }
     else {
-      printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
-             ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
+      // printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
+      //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
 
       // Get the filename
       // printf("sym_index:%li nb_ind_sym_filenames:%i\n", sym - (ElfW(Sym) *)symtab->data, itp->nb_ind_sym_filenames);
       const char *sym_fn =
           hash_table_get_by_hash((unsigned long)(sym - (ElfW(Sym) *)symtab->data), &itp->redir.sym_index_to_filename);
-      printf("index?:%li file='%s' %zu\n", sym - (ElfW(Sym) *)symtab->data, sym_fn, sym->st_size);
+      // printf("index?:%li file='%s' %zu\n", sym - (ElfW(Sym) *)symtab->data, sym_fn, sym->st_size);
       if (!sym_fn) {
         expect("sym_fn not NULL");
       }

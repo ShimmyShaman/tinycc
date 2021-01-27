@@ -763,17 +763,17 @@ LIBTCCAPI int tcci_add_library(TCCInterpState *itp, const char *libname)
 LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
   TCCInterpState *itp = tcc_mallocz(sizeof(TCCInterpState));
-  init_hash_table(512, &itp->symbols);
+  init_hash_table(677, &itp->symbols);
 
   itp->debug_verbose = 0;
 
   char fyf[32], buf[512];
   itp->redir.do_subst = 0;
-  init_hash_table(32, &itp->redir.sym_index_to_filename);
+  init_hash_table(133, &itp->redir.sym_index_to_filename);
   {
     // Hash-To-Addr
     // TODO -- add a param for expected function declarations &/ redefinitions?
-    init_hash_table(1024, &itp->redir.hash_to_addr);
+    init_hash_table(1011, &itp->redir.hash_to_addr);
 
     strcpy(fyf, "__tcci_get_fptr_by_fname_hash_");
     sprintf(buf,
@@ -798,7 +798,7 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
   }
   {
     // Addr-To-Addr
-    init_hash_table(2048, &itp->redir.addr_to_addr);
+    init_hash_table(1937, &itp->redir.addr_to_addr);
 
     strcpy(fyf, "__tcci_get_fptr_by_prev_addr_");
     sprintf(buf,
