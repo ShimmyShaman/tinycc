@@ -684,16 +684,18 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
       // printf("itp->single_use.func_ptr = (void *)sym->st_value(%p);\n", (void *)sym->st_value);
       itp->single_use.func_ptr = (void *)sym->st_value;
     }
-    else {
+    else if (ELF64_ST_VISIBILITY(sym->st_other) == STV_DEFAULT) {
       // printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
       //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
 
       // Get the filename
-      // printf("sym_index:%li nb_ind_sym_filenames:%i\n", sym - (ElfW(Sym) *)symtab->data, itp->nb_ind_sym_filenames);
       const char *sym_fn =
           hash_table_get_by_hash((unsigned long)(sym - (ElfW(Sym) *)symtab->data), &itp->redir.sym_index_to_filename);
       // printf("index?:%li file='%s' %zu\n", sym - (ElfW(Sym) *)symtab->data, sym_fn, sym->st_size);
       if (!sym_fn) {
+        printf("sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
+               ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
+        printf("index?:%li file='%s' %zu\n", sym - (ElfW(Sym) *)symtab->data, sym_fn, sym->st_size);
         expect("sym_fn not NULL");
       }
 
