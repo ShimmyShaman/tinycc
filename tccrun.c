@@ -677,10 +677,12 @@ LIBTCCINTERPAPI int tcci_relocate_into_memory(TCCInterpState *itp)
 
     binding = ELF64_ST_BIND(sym->st_info);
     if (itp->in_single_use_state) {
-      if (itp->single_use.func_ptr || binding != STB_GLOBAL) {
-        // Only one should be set
-        return 5;
-      }
+      // printf("sus-sym->st_name:%s binding:%u st_shndx:%i st_other:%u\n", (char *)symtab->link->data + sym->st_name,
+      //        ELF64_ST_BIND(sym->st_info), sym->st_shndx, sym->st_other);
+      // if (itp->single_use.func_ptr ) {
+      //   // Only one should be set
+      //   return 7654;
+      // }
       // printf("itp->single_use.func_ptr = (void *)sym->st_value(%p);\n", (void *)sym->st_value);
       itp->single_use.func_ptr = (void *)sym->st_value;
     }

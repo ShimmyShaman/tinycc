@@ -504,6 +504,59 @@ void _test_static_func_replace_from_files(TCCInterpState *itp)
   MCtest(checkit1(98));
 }
 
+void _test_func_ptr_indirect_call(TCCInterpState *itp)
+{
+  // void *(*mc_routine)(void *) = (void *(*)(void *))state_args[0];
+  //   thread_res = mc_routine(wrapped_state);
+
+  // char buf[2048];
+  // sprintf(buf, "#include <stdio.h>\n"
+  //              "\n"
+  //              "struct albert {\n"
+  //              "  int (*hookup)(void);\n"
+  //              "};\n"
+  //              "\n"
+  //              "int _gethookup(void) {\n"
+  //              "  return 199;\n"
+  //              "}\n"
+  //              "\n"
+  //              "int doit(int expect) {\n"
+  //              "  struct albert bay;\n"
+  //              "  bay.hookup = &_gethookup;\n"
+  //              "  int res = bay.hookup();\n"
+  //              "  return res - expect;\n"
+  //              "}\n");
+  // MCtest(tcci_add_string(itp, "testies.c", buf));
+
+  // puts("#### Now Error One ###\n\n");
+
+  char buf[2048];
+  sprintf(buf, "#include <stdio.h>\n"
+               "\n"
+               "struct albert {\n"
+               "  int (*hookup)(void);\n"
+               "};\n"
+               "\n"
+               "int _gethookup(void) {\n"
+               "  return 199;\n"
+               "}\n"
+               "\n"
+               "int doit(int expect) {\n"
+               "  struct albert bay;\n"
+               "  bay.hookup = &_gethookup;\n"
+               "  struct albert *indir = &bay;\n"
+               "  int res = indir->hookup();\n"
+               "  return res - expect;\n"
+               "}\n");
+  MCtest(tcci_add_string(itp, "testies.c", buf));
+
+  dbp("####### Invoking doit() #######");
+
+  // -- invoke the address
+  int (*doit)(int) = (int (*)(int))tcci_get_symbol(itp, "doit");
+  MCtest(doit(199));
+}
+
 int getnb44(void) { return 44; }
 
 void _test_use_set_global_symbol(TCCInterpState *itp)
@@ -556,10 +609,11 @@ void test_itp()
   titp(_test_func_ptr_with_args_replace);
   titp(_test_struct_func_ptr_replace);
   titp(_test_variadic_func_ptr_replace);
-  // // itp->debug_verbose = 1;
+  // itp->debug_verbose = 1;
   titp(_test_static_func_replace);
   titp(_test_static_func_replace_from_files);
   titp(_test_use_set_global_symbol);
+  titp(_test_func_ptr_indirect_call);
 
   itp->debug_verbose = 0;
   exit(0);

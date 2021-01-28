@@ -31,8 +31,8 @@ LIBTCCINTERPAPI int tcci_add_string(TCCInterpState *ds, const char *filename, co
  * @result.
  * @result may be NULL.
  */
-LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename,
-                                                 const char *comma_seperated_includes, const char *code, void *vargs,
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *ds, const char *filename, int root_statement_count,
+                                                 const char **root_statements, const char *code, void *vargs,
                                                  void **result);
 /* compile a group of C-files then link */
 LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *ds, const char **files, unsigned nb_files);

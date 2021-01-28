@@ -805,12 +805,13 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
             "#include <stdio.h>\n"
             "\n"
             "void *%s(void *prev_addr) {\n"
-            // "  printf(\"!!__tcci_get_fptr_by_prev_addr_!!\\nprev_addr=%%p\\n\", prev_addr);\n"
+            // "  printf(\"!!__tcci_get_fptr_by_prev_addr_!! addr:%%p\", prev_addr);\n"
             "  void *fp = prev_addr;\n"
             "  while(prev_addr = ((void *(*)(unsigned long, void *))%p)((unsigned long)prev_addr, (void *)%p)) {\n"
-            // "    printf(\"--redirecting=>%%p\\n\", prev_addr);\n"
+            // "    printf(\"==>%%p\", prev_addr);\n"
             "    fp = prev_addr;\n"
             "  }\n"
+            // "  puts(\"\");\n"
             // "  printf(\"fp=%%p\\n\", fp);\n"
             "  return fp;\n"
             "}",
@@ -1043,8 +1044,8 @@ LIBTCCINTERPAPI int tcci_add_files(TCCInterpState *itp, const char **files, unsi
 //   return 0;
 // }
 
-LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *itp, const char *filename,
-                                                 const char *comma_seperated_includes, const char *code, void *vargs,
+LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *itp, const char *filename, int root_statement_count,
+                                                 const char **root_statements, const char *code, void *vargs,
                                                  void **result)
 {
   int prv_igv = itp->in_single_use_state; // TODO -- shouldn't be anything but false but we'll see
@@ -1053,45 +1054,19 @@ LIBTCCINTERPAPI int tcci_execute_single_use_code(TCCInterpState *itp, const char
   // CStr
   CString str;
   cstr_new(&str);
-  cstr_realloc(&str, 128 + 2 * strlen(comma_seperated_includes) + strlen(code));
+  cstr_realloc(&str, 128 + root_statement_count * 120 + strlen(code));
 
   // Pre-Includes
-  if (!comma_seperated_includes)
-    goto includes_complete;
-  int i = 0, s, e = 0;
-  while (1) {
-    s = i;
-    while (1) {
-      // printf("comma_seperated_includes[%i]='%c'\n", i, comma_seperated_includes[i]);
-      if (comma_seperated_includes[i] == '\0') {
-        e = 1;
-      }
-      else if (comma_seperated_includes[i] == ',') {
-        // Nothing
-      }
-      else {
-        ++i;
-        continue;
-      }
-
-      if (i - s > 0) {
-        cstr_cat(&str, "#include ", 9);
-        memcpy((char *)str.data + str.size, comma_seperated_includes + s, sizeof(char) * (i - s));
-        str.size += i - s;
-        cstr_ccat(&str, '\n');
-      }
-
-      if (e)
-        goto includes_complete;
-
-      ++i;
-      break;
-    }
+  int i, len;
+  for (i = 0; i < root_statement_count; ++i) {
+    len = strlen(root_statements[i]);
+    if (!len)
+      continue;
+    cstr_cat(&str, root_statements[i], len);
+    cstr_ccat(&str, '\n');
   }
 
   char single_use_func_name[60];
-
-includes_complete:
 
   // Temporary Function Name
   sprintf(single_use_func_name, "_tcci_single_use_func_%u", itp->single_use.uid_counter++);
@@ -1117,7 +1092,7 @@ includes_complete:
     // puts("executed!");
   }
   else {
-    printf("\nERR[824]: Invalid single-use code:\n\n%s\n", (char *)str.data);
+    printf("\nERR[824]:%i Invalid single-use code:\n\n%s\n", res, (char *)str.data);
   }
 
   // Cleanup ...

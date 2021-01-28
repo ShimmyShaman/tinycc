@@ -941,8 +941,8 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num, addr_t value, unsigned long s
                                &tcci_state->redir.sym_index_to_filename);
 
         // if (sym->c == 69) {
-        //   printf(">twas 69: '%s'\n", (const char *)hash_table_get_by_hash(69LU, &tcci_state->redir.sym_index_to_filename));
-        //   usleep(1000);
+        //   printf(">twas 69: '%s'\n", (const char *)hash_table_get_by_hash(69LU,
+        //   &tcci_state->redir.sym_index_to_filename)); usleep(1000);
         // }
         // printf("type:%i sym_scope:%i\n", sym->type.t, sym->f);
         // puts("b");
@@ -5522,10 +5522,14 @@ ST_FUNC void subst_itp_by_faddr()
   // Replace the previous
   CType was_type = vtop->type;
   CValue was_val = vtop->c;
-  vpop();
+  int was_r = vtop->r;
 
   dba(printf("was: type.t:%i type.ref:%p ->c:%li\n", was_type.t, was_type.ref, was_val.i);
+      printf("vtop: r:%u r2:%u sym:%p cmpop:%u cmpr:%u jfalse:%i jtrue:%i\n", vtop->r, vtop->r2, vtop->sym,
+             vtop->cmp_op, vtop->cmp_r, vtop->jfalse, vtop->jtrue);
       if (was_type.ref) { printf("was: was_type.ref->type.t:%i\n", was_type.ref->type.t); });
+
+  vpop();
 
   Sym sym;
   CType ptype, type;
@@ -5543,7 +5547,7 @@ ST_FUNC void subst_itp_by_faddr()
   // Push the function hash argument
   ptype.ref = was_type.ref;
   ptype.t = TOK_CLLONG;
-  vsetc(&was_type, VT_LVAL | VT_LOCAL, &was_val);
+  vsetc(&was_type, was_r, &was_val);
 
   // Call it
   gfunc_call(1);
