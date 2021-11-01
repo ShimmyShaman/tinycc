@@ -759,6 +759,21 @@ LIBTCCAPI int tcci_add_library(TCCInterpState *itp, const char *libname)
   return 0;
 }
 
+LIBTCCAPI int tcci_add_library_path(TCCInterpState *itp, const char *lib_path)
+{
+  char pbuf[512];
+  int n = strlen(lib_path);
+  strcpy(pbuf, lib_path);
+  if (pbuf[n - 1] == '\\')
+    pbuf[n - 1] = '/';
+  else if (pbuf[n - 1] != '/')
+    strcat(pbuf, "/");
+
+  char *lib_dup = tcc_strdup(pbuf);
+  dynarray_add(&itp->library_paths, &itp->nb_library_paths, lib_dup);
+  return 0;
+}
+
 /* create a new TCC interpretation context */
 LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
 {
@@ -953,6 +968,9 @@ static int _tcci_pre_compile(TCCInterpState *itp)
   }
 
   // Interpreter-scope libraries
+  for (int a = 0; a < itp->nb_library_paths; ++a) {
+    tcc_add_library_path(itp->s1, itp->library_paths[a]);
+  }
   for (int a = 0; a < itp->nb_libraries; ++a) {
     tcc_add_library(itp->s1, itp->libraries[a]);
   }

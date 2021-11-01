@@ -1013,6 +1013,8 @@ struct TCCInterpState {
   char **cmdline_defs;
   int nb_libraries;
   char **libraries;
+  int nb_library_paths;
+  char **library_paths;
 
   char **include_paths;
   int nb_include_paths;
