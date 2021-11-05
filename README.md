@@ -6,7 +6,7 @@ Tiny C Compiler
 
 **The original tinycc is at https://repo.or.cz/tinycc.git**
 
-**This is a forked version modified specifically for midge (https://github.com/ShimmyShaman/midge)**
+**This is a forked version modified specifically for midge (https://github.com/ShimmyShaman/midge). It is NOT a useable version otherwise**
 
 
 
