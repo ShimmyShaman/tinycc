@@ -790,6 +790,10 @@ LIBTCCINTERPAPI TCCInterpState *tcci_new(void)
     // TODO -- add a param for expected function declarations &/ redefinitions?
     init_hash_table(1011, &itp->redir.hash_to_addr);
 
+    // tcci_add_include_path(itp, "dep/tinycc/include");
+    // tcci_add_include_path(itp, "/usr/include/linux");
+    tcci_add_include_path(itp, "/usr/lib/gcc/x86_64-linux-gnu/9/include/");
+
     strcpy(fyf, "__tcci_get_fptr_by_fname_hash_");
     sprintf(buf,
             "#include <stdio.h>\n"
@@ -956,6 +960,7 @@ static int _tcci_pre_compile(TCCInterpState *itp)
   // Interpreter-scope include paths
   for (int a = 0; a < itp->nb_include_paths; ++a) {
     res = tcc_add_include_path(itp->s1, itp->include_paths[a]);
+    // printf("include_path:%s\n", itp->include_paths[a]);
     if (res) {
       puts("ERR[6259]"); // TODO
       return res;
